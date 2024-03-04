@@ -104,18 +104,18 @@ __hash_prime_bigger(uint64_t size)
     uint64_t size;                                                            \
     uint64_t* flags;                                                          \
     hash_##name##_entry_t* entries;                                           \
-  } _hash_##name##_array_t;                                                    \
+  } _hash_##name##_array_t;                                                   \
   typedef struct {                                                            \
     uint64_t size;                                                            \
     uint64_t capacity;                                                        \
     uint64_t* flags;                                                          \
     hash_##name##_entry_t* entries;                                           \
-  } _hash_##name##_scale_array_t;                                              \
+  } _hash_##name##_scale_array_t;                                             \
   typedef struct {                                                            \
     uint64_t size;                                                            \
     int m;                                                                    \
-    _hash_##name##_array_t* array;                                             \
-    _hash_##name##_scale_array_t* scale_array;                                 \
+    _hash_##name##_array_t* array;                                            \
+    _hash_##name##_scale_array_t* scale_array;                                \
   } hash_##name##_t;
 
 #define __define_hash_set_entry(name, ktype)                                  \
@@ -128,18 +128,18 @@ __hash_prime_bigger(uint64_t size)
     uint64_t size;                                                            \
     uint64_t* flags;                                                          \
     hash_##name##_entry_t* entries;                                           \
-  } _hash_##name##_array_t;                                                    \
+  } _hash_##name##_array_t;                                                   \
   typedef struct {                                                            \
     uint64_t size;                                                            \
     uint64_t capacity;                                                        \
     uint64_t* flags;                                                          \
     hash_##name##_entry_t* entries;                                           \
-  } _hash_##name##_scale_array_t;                                              \
+  } _hash_##name##_scale_array_t;                                             \
   typedef struct {                                                            \
     uint64_t size;                                                            \
     int m;                                                                    \
-    _hash_##name##_array_t* array;                                             \
-    _hash_##name##_scale_array_t* scale_array;                                 \
+    _hash_##name##_array_t* array;                                            \
+    _hash_##name##_scale_array_t* scale_array;                                \
   } hash_##name##_t;
 
 static inline uint32_t
@@ -190,7 +190,7 @@ __string_hashcode(const char* s)
   {                                                                           \
     max_size = max_size < 128 ? 128 : max_size;                               \
     m = m < 2 ? 2 : m;                                                        \
-    int n = 0;                                                                    \
+    int n = 0;                                                                \
     __hash_prime(max_size, &n);                                               \
     uint64_t size_list[60] = { 0 };                                           \
     if (m > n) {                                                              \
@@ -207,7 +207,7 @@ __string_hashcode(const char* s)
     table->size = 0;                                                          \
     table->m = m;                                                             \
     table->array =                                                            \
-        (_hash_##name##_array_t*)malloc(sizeof(_hash_##name##_array_t) * m);    \
+        (_hash_##name##_array_t*)malloc(sizeof(_hash_##name##_array_t) * m);  \
     for (int i = 0; i < m; i++) {                                             \
       table->array[i].mask = size_list[i] - 1;                                \
       table->array[i].prime = size_list[i];                                   \
@@ -219,8 +219,8 @@ __string_hashcode(const char* s)
       table->array[i].entries = (hash_##name##_entry_t*)malloc(               \
           sizeof(hash_##name##_entry_t) * size_list[i]);                      \
     }                                                                         \
-    table->scale_array = (_hash_##name##_scale_array_t*)malloc(                \
-        sizeof(_hash_##name##_scale_array_t));                                 \
+    table->scale_array = (_hash_##name##_scale_array_t*)malloc(               \
+        sizeof(_hash_##name##_scale_array_t));                                \
     table->scale_array->entries =                                             \
         (hash_##name##_entry_t*)malloc(sizeof(hash_##name##_entry_t) * 128);  \
     table->scale_array->capacity = 128;                                       \
@@ -247,7 +247,7 @@ __string_hashcode(const char* s)
       hash_##name##_t* table, ktype key, int* found)                          \
   {                                                                           \
     uint64_t h = fhash(key);                                                  \
-    _hash_##name##_array_t* array = table->array;                              \
+    _hash_##name##_array_t* array = table->array;                             \
     hash_##name##_entry_t* entries;                                           \
     for (int i = 0; i < table->m; i++) {                                      \
       if (!array[i].size) {                                                   \
@@ -267,7 +267,7 @@ __string_hashcode(const char* s)
     uint64_t index = h & (table->scale_array->capacity - 1);                  \
     entries = table->scale_array->entries;                                    \
     uint64_t start = index;                                                   \
-    uint64_t i = index;                                                            \
+    uint64_t i = index;                                                       \
     while (1) {                                                               \
       if (i >= table->scale_array->capacity) {                                \
         i = 0;                                                                \
@@ -289,7 +289,7 @@ __string_hashcode(const char* s)
       hash_##name##_t* table, hash_##name##_entry_t* entry)                   \
   {                                                                           \
     uint64_t h = fhash(entry->key);                                           \
-    _hash_##name##_array_t* array_list = table->array;                         \
+    _hash_##name##_array_t* array_list = table->array;                        \
     hash_##name##_entry_t* entries;                                           \
     for (int i = 0; i < table->m; i++) {                                      \
       entries = array_list[i].entries;                                        \
@@ -303,7 +303,7 @@ __string_hashcode(const char* s)
       __set(array_list[i].flags, index);                                      \
       return &entries[index];                                                 \
     }                                                                         \
-    _hash_##name##_scale_array_t* scale_array = table->scale_array;            \
+    _hash_##name##_scale_array_t* scale_array = table->scale_array;           \
     if (scale_array->size > (scale_array->capacity / 5 * 4)) {                \
       uint64_t old_cap = scale_array->capacity;                               \
       uint64_t new_cap = __hash_prime_bigger(scale_array->capacity + 1);      \
@@ -315,13 +315,13 @@ __string_hashcode(const char* s)
       memset(scale_array->flags, 0, sizeof(uint64_t) * (new_cap + 63) / 64);  \
       scale_array->entries = (hash_##name##_entry_t*)malloc(                  \
           sizeof(hash_##name##_entry_t) * new_cap);                           \
-      for (uint64_t i = 0; i < old_cap; i++) {                                     \
+      for (uint64_t i = 0; i < old_cap; i++) {                                \
         if (!__is_set(flags, i)) {                                            \
           continue;                                                           \
         }                                                                     \
         uint64_t index = fhash(entries[i].key) % (new_cap - 1);               \
         if (__is_set(scale_array->flags, index)) {                            \
-          uint64_t j = index;                                                      \
+          uint64_t j = index;                                                 \
           uint64_t start = index;                                             \
           while (1) {                                                         \
             if (j >= new_cap) {                                               \
@@ -373,13 +373,12 @@ __string_hashcode(const char* s)
     return NULL;                                                              \
   }
 
-
 #define define_hashtable(name, ktype, vtype, feq, fhash)                      \
   __define_hash_table_entry(table_##name, ktype, vtype);                      \
   __define_hash_method(table_##name, feq, fhash, ktype, vtype);
 
-#define define_hashset(name, ketype, feq, fhash) \
-  __define_hash_set_entry(set_##name, ketype);   \
+#define define_hashset(name, ketype, feq, fhash)                              \
+  __define_hash_set_entry(set_##name, ketype);                                \
   __define_hash_method(set_##name, feq, fhash, ketype, NULL);
 
 #define ii_eq(entry, key) ((entry).key == (key))
@@ -405,6 +404,5 @@ define_hashtable(li, int64_t, int, li_eq, li_hash);
 define_hashset(i, int, ii_eq, ii_hash);
 define_hashset(l, int64_t, ll_eq, ll_hash);
 define_hashset(s, char*, si_eq, si_hash);
-
 
 #endif
