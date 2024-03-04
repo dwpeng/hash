@@ -79,3 +79,54 @@ cd hash
 make
 ./test
 ```
+
+## complex example
+```c
+#include "hash.h"
+#include <assert.h>
+#include <stdio.h>
+
+typedef struct {
+  char id[10];
+  int age;
+  char name;
+} person_t;
+
+#define int_eq(entry, b) ((entry).key == (b))
+#define int_hash(a) (__lh3_Jenkins_hash_int(a))
+define_hashtable(person, int, person_t*, int_eq, int_hash);
+
+int
+main()
+{
+  person_t persons[] = {
+    { "1", 10, 'a' },
+    { "2", 20, 'b' },
+    { "3", 30, 'c' },
+    { "4", 40, 'd' },
+    { "5", 50, 'e' },
+    { "6", 60, 'f' },
+    { "7", 70, 'g' },
+    { "8", 80, 'h' },
+    { "9", 90, 'i' },
+    { "10",100,'j' },
+  };
+  int N = 10;
+  int M = 5;
+  hashtable_person_t* table = hashtable_person_init(N, M);
+  hashtable_person_entry_t entry = { 0 };
+  for (int i = 0; i < N; i++) {
+    entry.key = i;
+    entry.value = &persons[i];
+    hashtable_person_put(table, &entry);
+  }
+  for (int i = 0; i < N; i++) {
+    int found = 0;
+    hashtable_person_entry_t* e = hashtable_person_get(table, i, &found);
+    assert(found);
+    assert(persons[i].age == e->value->age);
+    printf("person[%s]: %d\n", e->value->id, e->value->age);
+  }
+  hashtable_person_free(table);
+}
+```
