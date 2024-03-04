@@ -1,4 +1,19 @@
 ## hashtable/hashset
+A hashtable/hashset implementation in C. It's a generic implementation, you can define your own key and value type. 
+Both multiple layers of hash table and linear probing is used to reduce the collision.
+```txt
+  +-----------------+ ---------------
+  |       N0        |               |
+  +-----------------+               |
+  |    N1        |                  |
+  +--------------+               multiple layers
+  |  N2      |                      |
+  +----------+                      |
+  |  N3  |                          |
+  +------+---------------------+ ----
+  |                            |  linear probing
+  +----------------------------+ ----
+```
 
 ## usage
 ### define hashtable/hashset
