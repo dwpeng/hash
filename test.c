@@ -25,6 +25,13 @@ main()
     assert(i == e->key);
     assert(found);
   }
+  hash_table_ii_entry_t* e = NULL;
+  int size = 0;
+  while((e=hash_table_ii_iter(table))!=NULL){
+    size++;
+    assert(e->key == e->value);
+  }
+  printf("size: %d\n", size);
   hash_table_ii_free(table);
 
   hash_set_i_t* set = hash_set_i_init(10000000, 5);

@@ -97,31 +97,14 @@ __hash_prime_bigger(uint64_t size)
   typedef struct {                                                            \
     ktype key;                                                                \
     vtype value;                                                              \
-  } hash_##name##_entry_t;                                                    \
-  typedef struct {                                                            \
-    uint64_t mask;                                                            \
-    uint64_t prime;                                                           \
-    uint64_t size;                                                            \
-    uint64_t* flags;                                                          \
-    hash_##name##_entry_t* entries;                                           \
-  } _hash_##name##_array_t;                                                   \
-  typedef struct {                                                            \
-    uint64_t size;                                                            \
-    uint64_t capacity;                                                        \
-    uint64_t* flags;                                                          \
-    hash_##name##_entry_t* entries;                                           \
-  } _hash_##name##_scale_array_t;                                             \
-  typedef struct {                                                            \
-    uint64_t size;                                                            \
-    int m;                                                                    \
-    _hash_##name##_array_t* array;                                            \
-    _hash_##name##_scale_array_t* scale_array;                                \
-  } hash_##name##_t;
+  } hash_##name##_entry_t;
 
 #define __define_hash_set_entry(name, ktype)                                  \
   typedef struct {                                                            \
     ktype key;                                                                \
-  } hash_##name##_entry_t;                                                    \
+  } hash_##name##_entry_t;
+
+#define __define_hash(name, ktype, vtype, feq, fhash)                         \
   typedef struct {                                                            \
     uint64_t mask;                                                            \
     uint64_t prime;                                                           \
@@ -140,6 +123,13 @@ __hash_prime_bigger(uint64_t size)
     int m;                                                                    \
     _hash_##name##_array_t* array;                                            \
     _hash_##name##_scale_array_t* scale_array;                                \
+    struct {                                                                  \
+      uint64_t offset;                                                        \
+      uint64_t size;                                                          \
+      int status;                                                             \
+      int m;                                                                  \
+      int type;                                                               \
+    } iter;                                                                   \
   } hash_##name##_t;
 
 static inline uint32_t
@@ -228,6 +218,10 @@ __string_hashcode(const char* s)
         (uint64_t*)malloc(sizeof(uint64_t) * (128 + 63) / 64);                \
     memset(table->scale_array->flags, 0, sizeof(uint64_t) * (128 + 63) / 64); \
     table->scale_array->size = 0;                                             \
+    table->iter.offset = 0;                                                   \
+    table->iter.status = 0;                                                   \
+    table->iter.m = 0;                                                        \
+    table->iter.type = 0;                                                     \
     return table;                                                             \
   }                                                                           \
                                                                               \
@@ -371,14 +365,65 @@ __string_hashcode(const char* s)
       }                                                                       \
     }                                                                         \
     return NULL;                                                              \
+  }                                                                           \
+  static inline hash_##name##_entry_t* hash_##name##_iter(                    \
+      hash_##name##_t* table)                                                 \
+  {                                                                           \
+    if (table->iter.status == 1) {                                            \
+      return NULL;                                                            \
+    }                                                                         \
+    if (table->iter.size == table->size || !table->size) {                    \
+      table->iter.status = 1;                                                 \
+      return NULL;                                                            \
+    }                                                                         \
+    if (table->iter.type == 0) {                                              \
+      while (1) {                                                             \
+        if (table->m == table->iter.m) {                                      \
+          table->iter.type = 1;                                               \
+          table->iter.offset = 0;                                             \
+          break;                                                              \
+        }                                                                     \
+        _hash_##name##_array_t* array = &table->array[table->iter.m];         \
+        hash_##name##_entry_t* entries = table->array[table->iter.m].entries; \
+        while (!__is_set(array->flags, table->iter.offset)                    \
+               && table->iter.offset < array->prime) {                        \
+          table->iter.offset++;                                               \
+        }                                                                     \
+        if (table->iter.offset == array->prime) {                             \
+          table->iter.m++;                                                    \
+          table->iter.offset = 0;                                             \
+          continue;                                                           \
+        }                                                                     \
+        table->iter.size++;                                                   \
+        return &entries[table->iter.offset];                                  \
+      }                                                                       \
+    }                                                                         \
+    if (!table->scale_array->size) {                                          \
+      table->iter.status = 1;                                                 \
+      return NULL;                                                            \
+    }                                                                         \
+    _hash_##name##_scale_array_t* scale_array = table->scale_array;           \
+    hash_##name##_entry_t* entries = scale_array->entries;                    \
+    while (!__is_set(scale_array->flags, table->iter.offset)                  \
+           && table->iter.offset < scale_array->capacity) {                   \
+      table->iter.offset++;                                                   \
+    }                                                                         \
+    if (table->iter.offset == scale_array->capacity) {                        \
+      table->iter.status = 1;                                                 \
+      return NULL;                                                            \
+    }                                                                         \
+    table->iter.size++;                                                       \
+    return &entries[table->iter.offset];                                      \
   }
 
 #define define_hashtable(name, ktype, vtype, feq, fhash)                      \
   __define_hash_table_entry(table_##name, ktype, vtype);                      \
+  __define_hash(table_##name, ktype, vtype, feq, fhash);                      \
   __define_hash_method(table_##name, feq, fhash, ktype, vtype);
 
 #define define_hashset(name, ketype, feq, fhash)                              \
   __define_hash_set_entry(set_##name, ketype);                                \
+  __define_hash(set_##name, ketype, NULL, feq, fhash);                        \
   __define_hash_method(set_##name, feq, fhash, ketype, NULL);
 
 #define ii_eq(entry, key) ((entry).key == (key))
