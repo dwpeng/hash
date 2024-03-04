@@ -441,6 +441,10 @@ __string_hashcode(const char* s)
 #define hashset_iter(name, table)                hashset_##name##_iter(table)
 // clang-format on
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define ii_eq(entry, key) ((entry).key == (key))
 #define ii_hash(key) __lh3_Jenkins_hash_int(key)
 define_hashtable(ii, int, int, ii_eq, ii_hash);
@@ -465,4 +469,7 @@ define_hashset(i, int, ii_eq, ii_hash);
 define_hashset(l, int64_t, ll_eq, ll_hash);
 define_hashset(s, char*, si_eq, si_hash);
 
+#ifdef __cplusplus
+}
+#endif
 #endif
