@@ -221,6 +221,7 @@ __string_hashcode(const char* s)
     table->iter.status = 0;                                                   \
     table->iter.m = 0;                                                        \
     table->iter.type = 0;                                                     \
+    table->iter.size = 0;                                                     \
     return table;                                                             \
   }                                                                           \
                                                                               \
