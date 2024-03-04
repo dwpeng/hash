@@ -9,7 +9,7 @@ test()
   int N = 100000;
   int M = 5;
   hashtable_ii_t* table = hashtable_ii_init(N, M);
-  hashtable_ii_entry_t entry = { 0 };
+  hashtable_ii_entry_t entry = { 0, 0 };
   for (int i = 0; i < N; i++) {
     entry.key = i;
     entry.value = i;

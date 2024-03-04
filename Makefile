@@ -1,12 +1,16 @@
 cc := gcc
 CFLAGS := -Wall -Wextra -Werror -O3
 
-all: test
+all: test testcc
 
-test: test.o
-	$(cc) $(CFLAGS) -o test test.o
+test:
+	$(cc) $(CFLAGS) -o test test.c
+
+testcc:
+	$(cc) $(CFLAGS) -o testcc test.cc
+
 
 .PHONY: clean
 
 clean:
-	rm -f test test.o
+	rm -f test testcc
