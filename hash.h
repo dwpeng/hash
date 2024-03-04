@@ -420,24 +420,26 @@ __string_hashcode(const char* s)
   __define_hash(table_##name, ktype, vtype, feq, fhash);                      \
   __define_hash_method(table_##name, feq, fhash, ktype, vtype);
 
-#define hashtable_init(name, max_size, m) hashtable_##name##_init(max_size, m)
-#define hashtable_free(name, table) hashtable_##name##_free(table)
-#define hashtable_get(name, table, key, found)                                \
-  hashtable_##name##_get(table, key, found)
-#define hashtable_put(name, table, entry) hashtable_##name##_put(table, entry)
-#define hashtable_iter(name, table) hashtable_##name##_iter(table)
+// clang-format off
+#define hashtable_init(name, max_size, m)        hashtable_##name##_init(max_size, m)
+#define hashtable_free(name, table)              hashtable_##name##_free(table)
+#define hashtable_get(name, table, key, found)   hashtable_##name##_get(table, key, found)
+#define hashtable_put(name, table, entry)        hashtable_##name##_put(table, entry)
+#define hashtable_iter(name, table)              hashtable_##name##_iter(table)
+// clang-format on
 
 #define define_hashset(name, ketype, feq, fhash)                              \
   __define_hash_set_entry(set_##name, ketype);                                \
   __define_hash(set_##name, ketype, NULL, feq, fhash);                        \
   __define_hash_method(set_##name, feq, fhash, ketype, NULL);
 
-#define hashset_init(name, max_size, m) hashset_##name##_init(max_size, m)
-#define hashset_free(name, table) hashset_##name##_free(table)
-#define hashset_get(name, table, key, found)                                  \
-  hashset_##name##_get(table, key, found)
-#define hashset_put(name, table, entry) hashset_##name##_put(table, entry)
-#define hashset_iter(name, table) hashset_##name##_iter(table)
+// clang-format off
+#define hashset_init(name, max_size, m)          hashset_##name##_init(max_size, m)
+#define hashset_free(name, table)                hashset_##name##_free(table)
+#define hashset_get(name, table, key, found)     hashset_##name##_get(table, key, found)
+#define hashset_put(name, table, entry)          hashset_##name##_put(table, entry)
+#define hashset_iter(name, table)                hashset_##name##_iter(table)
+// clang-format on
 
 #define ii_eq(entry, key) ((entry).key == (key))
 #define ii_hash(key) __lh3_Jenkins_hash_int(key)
