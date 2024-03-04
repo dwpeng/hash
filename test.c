@@ -5,9 +5,10 @@
 int
 main()
 {
-  hashtable_ii_t* table = hashtable_ii_init(10000000, 5);
-  hashtable_ii_entry_t entry = { 0 };
   int N = 10000000;
+  int M = 5;
+  hashtable_ii_t* table = hashtable_ii_init(N, M);
+  hashtable_ii_entry_t entry = { 0 };
   for (int i = 0; i < N; i++) {
     entry.key = i;
     entry.value = i;
@@ -34,7 +35,7 @@ main()
   printf("size: %d\n", size);
   hashtable_ii_free(table);
 
-  hashset_i_t* set = hashset_i_init(10000000, 5);
+  hashset_i_t* set = hashset_i_init(N, M);
   hashset_i_entry_t set_entry = { 0 };
   for (int i = 0; i < N; i++) {
     set_entry.key = i;

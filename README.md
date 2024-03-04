@@ -47,7 +47,7 @@ define_hashset(ii, int, hash_equal, hash_hash)
 // init
 int N = 1000000; // size
 int M = 5;       // layers
-hashtable_ii_t *h = hashtable_ii_init(M, N);
+hashtable_ii_t *h = hashtable_ii_init(N, M);
 
 // put
 hashtable_ii_entry_t entry = {
