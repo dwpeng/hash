@@ -7,6 +7,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define HASH_MMAP
+#if defined(HASH_MMAP) && defined(__linux__)
+#include <sys/mman.h>
+#define hmalloc(size)                                                         \
+  mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+#define hfree(ptr, size) munmap(ptr, size)
+#else
+#define hmalloc(size) malloc(size)
+#define hfree(ptr, size) free(ptr)
+#endif
+
 static const uint64_t sys_prime_list[61] = {
   0x7LLU,
   0xfLLU,
@@ -118,7 +129,8 @@ __hash_prime_bigger(uint64_t size)
     uint64_t* flags;                                                          \
     hash##name##_entry_t* entries;                                            \
   } _hash##name##_scale_array_t;                                              \
-  typedef struct {                                                            \
+  typedef struct hash##name##_t hash##name##_t;                               \
+  struct hash##name##_t {                                                     \
     uint64_t size;                                                            \
     int m;                                                                    \
     _hash##name##_array_t* array;                                             \
@@ -130,7 +142,7 @@ __hash_prime_bigger(uint64_t size)
       int m;                                                                  \
       int type;                                                               \
     } iter;                                                                   \
-  } hash##name##_t;
+  };
 
 static inline uint32_t
 __lh3_Jenkins_hash_int(uint32_t key)
@@ -202,19 +214,19 @@ __string_hashcode(const char* s)
       table->array[i].prime = size_list[i];                                   \
       table->array[i].size = 0;                                               \
       table->array[i].flags =                                                 \
-          (uint64_t*)malloc(sizeof(uint64_t) * (size_list[i] + 63) / 64);     \
+          (uint64_t*)hmalloc(sizeof(uint64_t) * (size_list[i] + 63) / 64);    \
       memset(table->array[i].flags, 0,                                        \
              sizeof(uint64_t) * (size_list[i] + 63) / 64);                    \
-      table->array[i].entries = (hash##name##_entry_t*)malloc(                \
+      table->array[i].entries = (hash##name##_entry_t*)hmalloc(               \
           sizeof(hash##name##_entry_t) * size_list[i]);                       \
     }                                                                         \
     table->scale_array = (_hash##name##_scale_array_t*)malloc(                \
         sizeof(_hash##name##_scale_array_t));                                 \
     table->scale_array->entries =                                             \
-        (hash##name##_entry_t*)malloc(sizeof(hash##name##_entry_t) * 128);    \
+        (hash##name##_entry_t*)hmalloc(sizeof(hash##name##_entry_t) * 128);   \
     table->scale_array->capacity = 128;                                       \
     table->scale_array->flags =                                               \
-        (uint64_t*)malloc(sizeof(uint64_t) * (128 + 63) / 64);                \
+        (uint64_t*)hmalloc(sizeof(uint64_t) * (128 + 63) / 64);               \
     memset(table->scale_array->flags, 0, sizeof(uint64_t) * (128 + 63) / 64); \
     table->scale_array->size = 0;                                             \
     table->iter.offset = 0;                                                   \
@@ -228,12 +240,16 @@ __string_hashcode(const char* s)
   static inline void hash##name##_free(hash##name##_t* table)                 \
   {                                                                           \
     for (int i = 0; i < table->m; i++) {                                      \
-      free(table->array[i].entries);                                          \
-      free(table->array[i].flags);                                            \
+      hfree(table->array[i].entries,                                          \
+            sizeof(hash##name##_entry_t) * table->array[i].prime);            \
+      hfree(table->array[i].flags,                                            \
+            sizeof(uint64_t) * ((table->array[i].prime + 63) / 64));          \
     }                                                                         \
     free(table->array);                                                       \
-    free(table->scale_array->entries);                                        \
-    free(table->scale_array->flags);                                          \
+    hfree(table->scale_array->entries,                                        \
+          (sizeof(hash##name##_entry_t) * table->scale_array->capacity));     \
+    hfree(table->scale_array->flags,                                          \
+          ((sizeof(uint64_t) * ((table->scale_array->capacity) + 63) / 64))); \
     free(table->scale_array);                                                 \
     free(table);                                                              \
   }                                                                           \
@@ -305,9 +321,9 @@ __string_hashcode(const char* s)
       uint64_t* flags = scale_array->flags;                                   \
       hash##name##_entry_t* entries = scale_array->entries;                   \
       scale_array->flags =                                                    \
-          (uint64_t*)malloc(sizeof(uint64_t) * (new_cap + 63) / 64);          \
+          (uint64_t*)hmalloc(sizeof(uint64_t) * (new_cap + 63) / 64);         \
       memset(scale_array->flags, 0, sizeof(uint64_t) * (new_cap + 63) / 64);  \
-      scale_array->entries = (hash##name##_entry_t*)malloc(                   \
+      scale_array->entries = (hash##name##_entry_t*)hmalloc(                  \
           sizeof(hash##name##_entry_t) * new_cap);                            \
       for (uint64_t i = 0; i < old_cap; i++) {                                \
         if (!__is_set(flags, i)) {                                            \
@@ -338,8 +354,8 @@ __string_hashcode(const char* s)
                  sizeof(hash##name##_entry_t));                               \
         }                                                                     \
       }                                                                       \
-      free(flags);                                                            \
-      free(entries);                                                          \
+      hfree(flags, sizeof(uint64_t) * (old_cap + 63) / 64);                   \
+      hfree(entries, sizeof(hash##name##_entry_t) * old_cap);                 \
       scale_array->capacity = new_cap;                                        \
     }                                                                         \
     uint64_t index = h % (scale_array->capacity - 1);                         \
