@@ -7,6 +7,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef HASH_MALLOC
+#define hash_malloc(size) malloc(size)
+#define hash_free(ptr) free(ptr)
+#define hash_realloc(ptr, size) realloc(ptr, size)
+#endif
+
 #define HASH_MMAP
 #if defined(HASH_MMAP) && defined(__linux__)
 #include <sys/mman.h>
@@ -14,8 +20,8 @@
   mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
 #define hfree(ptr, size) munmap(ptr, size)
 #else
-#define hmalloc(size) malloc(size)
-#define hfree(ptr, size) free(ptr)
+#define hmalloc(size) hash_malloc(size)
+#define hfree(ptr, size) hash_free(ptr)
 #endif
 
 static const uint64_t sys_prime_list[61] = {
@@ -204,11 +210,12 @@ __string_hashcode(const char* s)
       n--;                                                                    \
       i++;                                                                    \
     }                                                                         \
-    hash##name##_t* table = (hash##name##_t*)malloc(sizeof(hash##name##_t));  \
+    hash##name##_t* table =                                                   \
+        (hash##name##_t*)hash_malloc(sizeof(hash##name##_t));                 \
     table->size = 0;                                                          \
     table->m = m;                                                             \
-    table->array =                                                            \
-        (_hash##name##_array_t*)malloc(sizeof(_hash##name##_array_t) * m);    \
+    table->array = (_hash##name##_array_t*)hash_malloc(                       \
+        sizeof(_hash##name##_array_t) * m);                                   \
     for (int i = 0; i < m; i++) {                                             \
       table->array[i].mask = size_list[i] - 1;                                \
       table->array[i].prime = size_list[i];                                   \
@@ -220,7 +227,7 @@ __string_hashcode(const char* s)
       table->array[i].entries = (hash##name##_entry_t*)hmalloc(               \
           sizeof(hash##name##_entry_t) * size_list[i]);                       \
     }                                                                         \
-    table->scale_array = (_hash##name##_scale_array_t*)malloc(                \
+    table->scale_array = (_hash##name##_scale_array_t*)hash_malloc(           \
         sizeof(_hash##name##_scale_array_t));                                 \
     table->scale_array->entries =                                             \
         (hash##name##_entry_t*)hmalloc(sizeof(hash##name##_entry_t) * 128);   \
@@ -245,13 +252,13 @@ __string_hashcode(const char* s)
       hfree(table->array[i].flags,                                            \
             sizeof(uint64_t) * ((table->array[i].prime + 63) / 64));          \
     }                                                                         \
-    free(table->array);                                                       \
+    hash_free(table->array);                                                  \
     hfree(table->scale_array->entries,                                        \
           (sizeof(hash##name##_entry_t) * table->scale_array->capacity));     \
     hfree(table->scale_array->flags,                                          \
           ((sizeof(uint64_t) * ((table->scale_array->capacity) + 63) / 64))); \
-    free(table->scale_array);                                                 \
-    free(table);                                                              \
+    hash_free(table->scale_array);                                            \
+    hash_free(table);                                                         \
   }                                                                           \
   static inline hash##name##_entry_t* hash##name##_get(hash##name##_t* table, \
                                                        ktype key, int* found) \
