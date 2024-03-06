@@ -28,7 +28,7 @@ main()
   }
   hashtable_ii_entry_t* e = NULL;
   int size = 0;
-  while((e=hashtable_ii_iter(table))!=NULL){
+  while ((e = hashtable_ii_iter(table)) != NULL) {
     size++;
     assert(e->key == e->value);
   }
