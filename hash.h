@@ -243,7 +243,6 @@ __string_hashcode(const char* s)
     table->iter.size = 0;                                                     \
     return table;                                                             \
   }                                                                           \
-                                                                              \
   static inline void hash##name##_free(hash##name##_t* table)                 \
   {                                                                           \
     for (int i = 0; i < table->m; i++) {                                      \
@@ -302,16 +301,24 @@ __string_hashcode(const char* s)
     return NULL;                                                              \
   }                                                                           \
                                                                               \
-  static inline hash##name##_entry_t* hash##name##_put(                       \
-      hash##name##_t* table, hash##name##_entry_t* entry)                     \
+  static inline hash##name##_entry_t* __hash##name##_put(                     \
+      hash##name##_t* table, hash##name##_entry_t* entry, int replace,        \
+      int* exist)                                                             \
   {                                                                           \
     uint64_t h = fhash(entry->key);                                           \
     _hash##name##_array_t* array_list = table->array;                         \
     hash##name##_entry_t* entries;                                            \
+    ktype key = entry->key;                                                   \
     for (int i = 0; i < table->m; i++) {                                      \
       entries = array_list[i].entries;                                        \
       uint64_t index = h % array_list[i].mask;                                \
       if (__is_set(array_list[i].flags, index)) {                             \
+        if (feq(entries[index], key)) {                                       \
+          if (replace) {                                                      \
+            memcpy(entries + index, entry, sizeof(hash##name##_entry_t));     \
+          }                                                                   \
+          return &entries[index];                                             \
+        }                                                                     \
         continue;                                                             \
       }                                                                       \
       table->size++;                                                          \
@@ -374,6 +381,12 @@ __string_hashcode(const char* s)
         i = 0;                                                                \
       }                                                                       \
       if (__is_set(scale_array->flags, i)) {                                  \
+        if (feq(entries[i], key)) {                                           \
+          if (replace) {                                                      \
+            memcpy(entries + i, entry, sizeof(hash##name##_entry_t));         \
+          }                                                                   \
+          return &entries[i];                                                 \
+        }                                                                     \
         i++;                                                                  \
         continue;                                                             \
       }                                                                       \
@@ -388,6 +401,18 @@ __string_hashcode(const char* s)
       }                                                                       \
     }                                                                         \
     return NULL;                                                              \
+  }                                                                           \
+  static inline hash##name##_entry_t* hash##name##_put(                       \
+      hash##name##_t* table, hash##name##_entry_t* entry)                     \
+  {                                                                           \
+    int exist;                                                                \
+    return __hash##name##_put(table, entry, 1, &exist);                       \
+  }                                                                           \
+  static inline hash##name##_entry_t* hash##name##_put_if_not(                \
+      hash##name##_t* table, hash##name##_entry_t* entry, int replace,        \
+      int* exist)                                                             \
+  {                                                                           \
+    return __hash##name##_put(table, entry, replace, exist);                  \
   }                                                                           \
   static inline hash##name##_entry_t* hash##name##_iter(                      \
       hash##name##_t* table)                                                  \
