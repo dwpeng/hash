@@ -13,7 +13,6 @@
 #define hash_realloc(ptr, size) realloc(ptr, size)
 #endif
 
-#define HASH_MMAP
 #if defined(HASH_MMAP) && defined(__linux__)
 #include <sys/mman.h>
 #define hmalloc(size)                                                         \
