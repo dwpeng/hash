@@ -308,6 +308,7 @@ __string_hashcode(const char* s)
     _hash##name##_array_t* array_list = table->array;                         \
     hash##name##_entry_t* entries;                                            \
     ktype key = entry->key;                                                   \
+    *exist = 0;                                                               \
     for (int i = 0; i < table->m; i++) {                                      \
       entries = array_list[i].entries;                                        \
       uint64_t index = h % array_list[i].mask;                                \
