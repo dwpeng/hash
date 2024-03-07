@@ -316,6 +316,7 @@ __string_hashcode(const char* s)
           if (replace) {                                                      \
             memcpy(entries + index, entry, sizeof(hash##name##_entry_t));     \
           }                                                                   \
+          *exist = 1;                                                         \
           return &entries[index];                                             \
         }                                                                     \
         continue;                                                             \
@@ -384,6 +385,7 @@ __string_hashcode(const char* s)
           if (replace) {                                                      \
             memcpy(entries + i, entry, sizeof(hash##name##_entry_t));         \
           }                                                                   \
+          *exist = 1;                                                         \
           return &entries[i];                                                 \
         }                                                                     \
         i++;                                                                  \
