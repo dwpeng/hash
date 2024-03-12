@@ -1,4 +1,5 @@
 *.log
 /test
 /testcc
+/test-thread
 *.o
