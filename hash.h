@@ -279,7 +279,7 @@ __string_hashcode(const char* s)
       *found = 0;                                                             \
       return NULL;                                                            \
     }                                                                         \
-    uint64_t index = h & (table->scale_array->capacity - 1);                  \
+    uint64_t index = h % (table->scale_array->capacity - 1);                  \
     entries = table->scale_array->entries;                                    \
     uint64_t start = index;                                                   \
     uint64_t i = index;                                                       \
