@@ -419,9 +419,6 @@ __string_hashcode(const char* s)
   static inline hash##name##_entry_t* hash##name##_iter(                      \
       hash##name##_t* table)                                                  \
   {                                                                           \
-    if (table->iter.status == 1) {                                            \
-      return NULL;                                                            \
-    }                                                                         \
     if (table->iter.size == table->size || !table->size) {                    \
       table->iter.status = 1;                                                 \
       return NULL;                                                            \
@@ -445,7 +442,7 @@ __string_hashcode(const char* s)
           continue;                                                           \
         }                                                                     \
         table->iter.size++;                                                   \
-        return &entries[table->iter.offset];                                  \
+        return &entries[table->iter.offset++];                                \
       }                                                                       \
     }                                                                         \
     if (!table->scale_array->size) {                                          \
@@ -463,7 +460,7 @@ __string_hashcode(const char* s)
       return NULL;                                                            \
     }                                                                         \
     table->iter.size++;                                                       \
-    return &entries[table->iter.offset];                                      \
+    return &entries[table->iter.offset++];                                    \
   }
 
 #define define_hashtable(name, ktype, vtype, feq, fhash)                      \
