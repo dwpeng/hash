@@ -13,6 +13,8 @@
 #define hash_realloc(ptr, size) realloc(ptr, size)
 #endif
 
+#define LOAD 0.75 // default load factor
+
 #if defined(HASH_MMAP) && defined(__linux__)
 #include <sys/mman.h>
 #define hmalloc(size)                                                         \
@@ -138,6 +140,7 @@ __hash_prime_bigger(uint64_t size)
   struct hash##name##_t {                                                     \
     uint64_t size;                                                            \
     int m;                                                                    \
+    float load;                                                               \
     _hash##name##_array_t* array;                                             \
     _hash##name##_scale_array_t* scale_array;                                 \
     struct {                                                                  \
@@ -177,6 +180,20 @@ __lh3_Jenkins_hash_64(uint64_t key)
   return key;
 }
 
+static inline uint64_t
+__roundup64__(uint64_t x)
+{
+  x--;
+  x |= x >> 1;
+  x |= x >> 2;
+  x |= x >> 4;
+  x |= x >> 8;
+  x |= x >> 16;
+  x |= x >> 32;
+  x++;
+  return x;
+}
+
 static inline uint32_t
 __string_hashcode(const char* s)
 {
@@ -193,8 +210,10 @@ __string_hashcode(const char* s)
   ((flags)[(index) / 64] &= ~(1LLU << ((index) % 64)))
 
 #define __define_hash_method(name, feq, fhash, ktype, vtype)                  \
-  static inline hash##name##_t* hash##name##_init(size_t max_size, int m)     \
+  static inline hash##name##_t* hash##name##_init_with_load(                  \
+      size_t max_size, int m, float load)                                     \
   {                                                                           \
+    assert(load > 0 && load < 1);                                             \
     max_size = max_size < 128 ? 128 : max_size;                               \
     m = m < 2 ? 2 : m;                                                        \
     int n = 0;                                                                \
@@ -213,6 +232,7 @@ __string_hashcode(const char* s)
         (hash##name##_t*)hash_malloc(sizeof(hash##name##_t));                 \
     table->size = 0;                                                          \
     table->m = m;                                                             \
+    table->load = load;                                                       \
     table->array = (_hash##name##_array_t*)hash_malloc(                       \
         sizeof(_hash##name##_array_t) * m);                                   \
     for (int i = 0; i < m; i++) {                                             \
@@ -242,6 +262,10 @@ __string_hashcode(const char* s)
     table->iter.size = 0;                                                     \
     return table;                                                             \
   }                                                                           \
+  static inline hash##name##_t* hash##name##_init(size_t max_size, int m)     \
+  {                                                                           \
+    return hash##name##_init_with_load(max_size, m, LOAD);                    \
+  }                                                                           \
   static inline void hash##name##_free(hash##name##_t* table)                 \
   {                                                                           \
     for (int i = 0; i < table->m; i++) {                                      \
@@ -264,6 +288,7 @@ __string_hashcode(const char* s)
     uint64_t h = fhash(key);                                                  \
     _hash##name##_array_t* array = table->array;                              \
     hash##name##_entry_t* entries;                                            \
+    *found = 0;                                                               \
     for (int i = 0; i < table->m; i++) {                                      \
       if (!array[i].size) {                                                   \
         continue;                                                             \
@@ -276,7 +301,6 @@ __string_hashcode(const char* s)
       }                                                                       \
     }                                                                         \
     if (table->scale_array->size == 0) {                                      \
-      *found = 0;                                                             \
       return NULL;                                                            \
     }                                                                         \
     uint64_t index = h % (table->scale_array->capacity - 1);                  \
@@ -296,10 +320,8 @@ __string_hashcode(const char* s)
         break;                                                                \
       }                                                                       \
     }                                                                         \
-    *found = 0;                                                               \
     return NULL;                                                              \
   }                                                                           \
-                                                                              \
   static inline hash##name##_entry_t* __hash##name##_put(                     \
       hash##name##_t* table, hash##name##_entry_t* entry, int replace,        \
       int* exist)                                                             \
@@ -329,9 +351,10 @@ __string_hashcode(const char* s)
       return &entries[index];                                                 \
     }                                                                         \
     _hash##name##_scale_array_t* scale_array = table->scale_array;            \
-    if (scale_array->size > (scale_array->capacity / 5 * 4)) {                \
+    if ((double)scale_array->size / (double)scale_array->capacity             \
+        > table->load) {                                                      \
       uint64_t old_cap = scale_array->capacity;                               \
-      uint64_t new_cap = __hash_prime_bigger(scale_array->capacity + 1);      \
+      uint64_t new_cap = __roundup64__(scale_array->capacity + 1);            \
       assert(new_cap > old_cap);                                              \
       uint64_t* flags = scale_array->flags;                                   \
       hash##name##_entry_t* entries = scale_array->entries;                   \
@@ -340,6 +363,8 @@ __string_hashcode(const char* s)
       memset(scale_array->flags, 0, sizeof(uint64_t) * (new_cap + 63) / 64);  \
       scale_array->entries = (hash##name##_entry_t*)hmalloc(                  \
           sizeof(hash##name##_entry_t) * new_cap);                            \
+      memset(scale_array->entries, 0,                                         \
+             sizeof(hash##name##_entry_t) * new_cap);                         \
       for (uint64_t i = 0; i < old_cap; i++) {                                \
         if (!__is_set(flags, i)) {                                            \
           continue;                                                           \
@@ -375,7 +400,6 @@ __string_hashcode(const char* s)
     }                                                                         \
     uint64_t index = h % (scale_array->capacity - 1);                         \
     entries = scale_array->entries;                                           \
-    uint64_t start = index;                                                   \
     uint64_t i = index;                                                       \
     while (1) {                                                               \
       if (i >= scale_array->capacity) {                                       \
@@ -397,10 +421,6 @@ __string_hashcode(const char* s)
       table->size++;                                                          \
       memcpy(&scale_array->entries[i], entry, sizeof(hash##name##_entry_t));  \
       return &entries[i];                                                     \
-      i++;                                                                    \
-      if (i == start) {                                                       \
-        break;                                                                \
-      }                                                                       \
     }                                                                         \
     return NULL;                                                              \
   }                                                                           \
@@ -419,6 +439,9 @@ __string_hashcode(const char* s)
   static inline hash##name##_entry_t* hash##name##_iter(                      \
       hash##name##_t* table)                                                  \
   {                                                                           \
+    if (table->iter.status == 1) {                                            \
+      return NULL;                                                            \
+    }                                                                         \
     if (table->iter.size == table->size || !table->size) {                    \
       table->iter.status = 1;                                                 \
       return NULL;                                                            \
