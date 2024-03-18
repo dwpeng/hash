@@ -1,23 +1,26 @@
 cc := gcc
-CFLAGS := -Wall -Wextra -Werror -O3
+INC := -I./
+CFLAGS := -Wall -Wextra -Werror -O3 -g $(INC)
 
-all: test testcc test-thread test-set
+all: test-main test-cc test-thread test-set test-linear-probe
 
-test:
-	$(cc) $(CFLAGS) -o test test.c
+test-main:
+	$(cc) $(CFLAGS) -o test-main test/test.c
 
-testcc:
-	$(cc) $(CFLAGS) -o testcc test.cc
+test-cc:
+	$(cc) $(CFLAGS) -o test-cc test/test.cc
 
 test-set:
-	$(cc) $(CFLAGS) -o test-set test-set.c
-
+	$(cc) $(CFLAGS) -o test-set test/test-set.c
 
 test-thread:
-	$(cc) $(CFLAGS) -o test-thread test-thread.c -lpthread ./thpool/thpool.c
+	$(cc) $(CFLAGS) -o test-thread test/test-thread.c -lpthread ./thpool/thpool.c
+
+test-linear-probe:
+	$(cc) $(CFLAGS) -o test-linear-probe test/test-linear-probe.c
 
 
 .PHONY: clean
 
 clean:
-	rm -f test testcc test-thread test-set
+	rm -f test-main test-cc test-thread test-set test-linear-probe

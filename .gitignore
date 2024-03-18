@@ -1,6 +1,2 @@
 *.log
-/test
-/testcc
-/test-thread
-/test-set
-*.o
+/test-*
