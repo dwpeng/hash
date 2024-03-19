@@ -305,20 +305,25 @@ __string_hashcode(const char* s)
     }                                                                         \
     uint64_t index = h % (table->scale_array->capacity - 1);                  \
     entries = table->scale_array->entries;                                    \
-    uint64_t start = index;                                                   \
     uint64_t i = index;                                                       \
-    while (1) {                                                               \
+    uint64_t lookup = 0;                                                      \
+    uint64_t step = 0;                                                        \
+    while (step <= table->scale_array->capacity) {                            \
+      if (lookup >= table->scale_array->size) {                               \
+        break;                                                                \
+      }                                                                       \
       if (i >= table->scale_array->capacity) {                                \
         i = 0;                                                                \
       }                                                                       \
-      if (__is_set(table->scale_array->flags, i) && feq(entries[i], key)) {   \
-        *found = 1;                                                           \
-        return &entries[i];                                                   \
+      if (__is_set(table->scale_array->flags, i)) {                           \
+        if (feq(entries[i], key)) {                                           \
+          *found = 1;                                                         \
+          return &entries[i];                                                 \
+        }                                                                     \
+        lookup++;                                                             \
       }                                                                       \
       i++;                                                                    \
-      if (i == start) {                                                       \
-        break;                                                                \
-      }                                                                       \
+      step++;                                                                 \
     }                                                                         \
     return NULL;                                                              \
   }                                                                           \
