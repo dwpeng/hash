@@ -206,8 +206,6 @@ __string_hashcode(const char* s)
 
 #define __is_set(flags, index) (((flags)[(index) / 64] >> ((index) % 64)) & 1)
 #define __set(flags, index) ((flags)[(index) / 64] |= (1LLU << ((index) % 64)))
-#define __clear(flags, index)                                                 \
-  ((flags)[(index) / 64] &= ~(1LLU << ((index) % 64)))
 
 #define __define_hash_method(name, feq, fhash, ktype, vtype)                  \
   static inline hash##name##_t* hash##name##_init_with_load(                  \
@@ -282,13 +280,14 @@ __string_hashcode(const char* s)
     hash_free(table->scale_array);                                            \
     hash_free(table);                                                         \
   }                                                                           \
-  static inline hash##name##_entry_t* hash##name##_get(hash##name##_t* table, \
-                                                       ktype key, int* found) \
+  static inline hash##name##_entry_t* hash##name##_get_with_from(             \
+      hash##name##_t* table, ktype key, int* found, int* from)                \
   {                                                                           \
     uint64_t h = fhash(key);                                                  \
     _hash##name##_array_t* array = table->array;                              \
     hash##name##_entry_t* entries;                                            \
     *found = 0;                                                               \
+    *from = 0;                                                                \
     for (int i = 0; i < table->m; i++) {                                      \
       if (!array[i].size) {                                                   \
         continue;                                                             \
@@ -297,6 +296,7 @@ __string_hashcode(const char* s)
       uint64_t index = h % array[i].mask;                                     \
       if (__is_set(array[i].flags, index) && feq(entries[index], key)) {      \
         *found = 1;                                                           \
+        *from = 1;                                                            \
         return &entries[index];                                               \
       }                                                                       \
     }                                                                         \
@@ -322,15 +322,22 @@ __string_hashcode(const char* s)
     }                                                                         \
     return NULL;                                                              \
   }                                                                           \
+  static inline hash##name##_entry_t* hash##name##_get(hash##name##_t* table, \
+                                                       ktype key, int* found) \
+  {                                                                           \
+    int from;                                                                 \
+    return hash##name##_get_with_from(table, key, found, &from);              \
+  }                                                                           \
   static inline hash##name##_entry_t* __hash##name##_put(                     \
       hash##name##_t* table, hash##name##_entry_t* entry, int replace,        \
-      int* exist)                                                             \
+      int* exist, int* from)                                                  \
   {                                                                           \
     uint64_t h = fhash(entry->key);                                           \
     _hash##name##_array_t* array_list = table->array;                         \
     hash##name##_entry_t* entries;                                            \
     ktype key = entry->key;                                                   \
     *exist = 0;                                                               \
+    *from = 0;                                                                \
     for (int i = 0; i < table->m; i++) {                                      \
       entries = array_list[i].entries;                                        \
       uint64_t index = h % array_list[i].mask;                                \
@@ -340,6 +347,7 @@ __string_hashcode(const char* s)
             memcpy(entries + index, entry, sizeof(hash##name##_entry_t));     \
           }                                                                   \
           *exist = 1;                                                         \
+          *from = 1;                                                          \
           return &entries[index];                                             \
         }                                                                     \
         continue;                                                             \
@@ -348,6 +356,7 @@ __string_hashcode(const char* s)
       array_list[i].size++;                                                   \
       memcpy(entries + index, entry, sizeof(hash##name##_entry_t));           \
       __set(array_list[i].flags, index);                                      \
+      *from = 1;                                                              \
       return &entries[index];                                                 \
     }                                                                         \
     _hash##name##_scale_array_t* scale_array = table->scale_array;            \
@@ -428,13 +437,14 @@ __string_hashcode(const char* s)
       hash##name##_t* table, hash##name##_entry_t* entry)                     \
   {                                                                           \
     int exist;                                                                \
-    return __hash##name##_put(table, entry, 1, &exist);                       \
+    int from;                                                                 \
+    return __hash##name##_put(table, entry, 1, &exist, &from);                \
   }                                                                           \
   static inline hash##name##_entry_t* hash##name##_put_if_not(                \
       hash##name##_t* table, hash##name##_entry_t* entry, int replace,        \
-      int* exist)                                                             \
+      int* exist, int* from)                                                  \
   {                                                                           \
-    return __hash##name##_put(table, entry, replace, exist);                  \
+    return __hash##name##_put(table, entry, replace, exist, from);            \
   }                                                                           \
   static inline hash##name##_entry_t* hash##name##_iter(                      \
       hash##name##_t* table)                                                  \
