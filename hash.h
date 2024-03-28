@@ -17,6 +17,12 @@
 
 #if defined(HASH_MMAP) && defined(__linux__)
 #include <sys/mman.h>
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+#ifndef MAP_ANON
+#define MAP_ANON 0x20
+#endif
 #define hmalloc(size)                                                         \
   mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
 #define hfree(ptr, size) munmap(ptr, size)
