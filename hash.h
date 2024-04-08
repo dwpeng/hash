@@ -523,6 +523,7 @@ __string_hashcode(const char* s)
   __define_hash_method(table_##name, feq, fhash, ktype, vtype);
 
 // clang-format off
+#define hashtable_init_with_load(name, max_size, m, load) hashtable_##name##_init_with_load(max_size, m, load)
 #define hashtable_init(name, max_size, m)        hashtable_##name##_init(max_size, m)
 #define hashtable_free(name, table)              hashtable_##name##_free(table)
 #define hashtable_get(name, table, key, found)   hashtable_##name##_get(table, key, found)
@@ -536,6 +537,7 @@ __string_hashcode(const char* s)
   __define_hash_method(set_##name, feq, fhash, ketype, NULL);
 
 // clang-format off
+#define hashset_init_with_load(name, max_size, m, load) hashset_##name##_init_with_load(max_size, m, load)
 #define hashset_init(name, max_size, m)          hashset_##name##_init(max_size, m)
 #define hashset_free(name, table)                hashset_##name##_free(table)
 #define hashset_get(name, table, key, found)     hashset_##name##_get(table, key, found)
