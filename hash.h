@@ -309,7 +309,7 @@ __string_hashcode(const char* s)
           return NULL;                                                        \
         }                                                                     \
         entries = array[i].entries;                                           \
-        if (feq(entries[index], key)) {                                       \
+        if (feq(entries[index].key, key)) {                                       \
           *found = 1;                                                         \
           return &entries[index];                                             \
         }                                                                     \
@@ -331,7 +331,7 @@ __string_hashcode(const char* s)
         i = 0;                                                                \
       }                                                                       \
       if (__is_set(table->scale_array->flags, i)) {                           \
-        if (feq((*entries[i]), key)) {                                        \
+        if (feq((entries[i]->key), key)) {                                        \
           *found = 1;                                                         \
           return entries[i];                                                  \
         }                                                                     \
@@ -360,7 +360,7 @@ __string_hashcode(const char* s)
       entries = array_list[i].entries;                                        \
       uint64_t index = h % array_list[i].mask;                                \
       if (__is_set(array_list[i].flags, index)) {                             \
-        if (feq(entries[index], key)) {                                       \
+        if (feq(entries[index].key, key)) {                                   \
           if (replace) {                                                      \
             memcpy(entries + index, entry, sizeof(hash##name##_entry_t));     \
           }                                                                   \
@@ -430,7 +430,7 @@ __string_hashcode(const char* s)
           i = 0;                                                              \
         }                                                                     \
         if (__is_set(scale_array->flags, i)) {                                \
-          if (feq((*entries[i]), key)) {                                      \
+          if (feq((entries[i]->key), key)) {                                      \
             if (replace) {                                                    \
               hash##name##_entry_t* e = (hash##name##_entry_t*)hash_malloc(   \
                   sizeof(hash##name##_entry_t));                              \
@@ -549,23 +549,23 @@ __string_hashcode(const char* s)
 extern "C" {
 #endif
 
-#define ii_eq(entry, key) ((entry).key == (key))
+#define ii_eq(key1, key2) (key1 == key2)
 #define ii_hash(key) __lh3_Jenkins_hash_int(key)
 define_hashtable(ii, int, int, ii_eq, ii_hash);
 
-#define ll_eq(entry, key) ((entry).key == (key))
+#define ll_eq(key1, key2) (key1 == key2)
 #define ll_hash(key) __lh3_Jenkins_hash_64(key)
 define_hashtable(ll, int64_t, int64_t, ll_eq, ll_hash);
 
-#define si_eq(entry, key) (strcmp((entry).key, (key)) == 0)
+#define si_eq(key1, key2) (strcmp(key1, key2) == 0)
 #define si_hash(key) __string_hashcode(key)
 define_hashtable(si, char*, int, si_eq, si_hash);
 
-#define ss_eq(entry, key) (strcmp((entry).key, (key)) == 0)
+#define ss_eq(key1, key2) (strcmp(key1, key2) == 0)
 #define ss_hash(key) __string_hashcode(key)
 define_hashtable(ss, char*, char*, ss_eq, ss_hash);
 
-#define li_eq(entry, key) ((entry).key == (key))
+#define li_eq(key1, key2) (key1 == key2)
 #define li_hash(key) __lh3_Jenkins_hash_64(key)
 define_hashtable(li, int64_t, int, li_eq, li_hash);
 
