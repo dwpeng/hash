@@ -140,7 +140,7 @@ __hash_prime_bigger(uint64_t size)
     uint64_t size;                                                            \
     uint64_t capacity;                                                        \
     uint64_t* flags;                                                          \
-    hash##name##_entry_t* entries;                                            \
+    hash##name##_entry_t** entries;                                           \
   } _hash##name##_scale_array_t;                                              \
   typedef struct hash##name##_t hash##name##_t;                               \
   struct hash##name##_t {                                                     \
@@ -253,7 +253,7 @@ __string_hashcode(const char* s)
     table->scale_array = (_hash##name##_scale_array_t*)hash_malloc(           \
         sizeof(_hash##name##_scale_array_t));                                 \
     table->scale_array->entries =                                             \
-        (hash##name##_entry_t*)hmalloc(sizeof(hash##name##_entry_t) * 128);   \
+        (hash##name##_entry_t**)hmalloc(sizeof(hash##name##_entry_t*) * 128); \
     table->scale_array->capacity = 128;                                       \
     table->scale_array->flags =                                               \
         (uint64_t*)hmalloc(sizeof(uint64_t) * (128 + 63) / 64);               \
@@ -279,6 +279,11 @@ __string_hashcode(const char* s)
             sizeof(uint64_t) * ((table->array[i].prime + 63) / 64));          \
     }                                                                         \
     hash_free(table->array);                                                  \
+    for (uint64_t i = 0; i < table->scale_array->capacity; i++) {             \
+      if (__is_set(table->scale_array->flags, i)) {                           \
+        hash_free(table->scale_array->entries[i]);                            \
+      }                                                                       \
+    }                                                                         \
     hfree(table->scale_array->entries,                                        \
           (sizeof(hash##name##_entry_t) * table->scale_array->capacity));     \
     hfree(table->scale_array->flags,                                          \
@@ -287,30 +292,34 @@ __string_hashcode(const char* s)
     hash_free(table);                                                         \
   }                                                                           \
   static inline hash##name##_entry_t* hash##name##_get_with_from(             \
-      hash##name##_t* table, ktype key, int* found, int* from)                \
+      hash##name##_t* table, ktype key, int* found)                           \
   {                                                                           \
     uint64_t h = fhash(key);                                                  \
     _hash##name##_array_t* array = table->array;                              \
-    hash##name##_entry_t* entries;                                            \
-    *found = 0;                                                               \
-    *from = 0;                                                                \
-    for (int i = 0; i < table->m; i++) {                                      \
-      if (!array[i].size) {                                                   \
-        continue;                                                             \
-      }                                                                       \
-      entries = array[i].entries;                                             \
-      uint64_t index = h % array[i].mask;                                     \
-      if (__is_set(array[i].flags, index) && feq(entries[index], key)) {      \
-        *found = 1;                                                           \
-        *from = 1;                                                            \
-        return &entries[index];                                               \
+    {                                                                         \
+      hash##name##_entry_t* entries;                                          \
+      *found = 0;                                                             \
+      for (int i = 0; i < table->m; i++) {                                    \
+        if (!array[i].size) {                                                 \
+          continue;                                                           \
+        }                                                                     \
+        uint64_t index = h % array[i].mask;                                   \
+        if (!__is_set(array[i].flags, index)) {                               \
+          *found = 0;                                                         \
+          return NULL;                                                        \
+        }                                                                     \
+        entries = array[i].entries;                                           \
+        if (feq(entries[index], key)) {                                       \
+          *found = 1;                                                         \
+          return &entries[index];                                             \
+        }                                                                     \
       }                                                                       \
     }                                                                         \
     if (table->scale_array->size == 0) {                                      \
       return NULL;                                                            \
     }                                                                         \
     uint64_t index = h % (table->scale_array->capacity - 1);                  \
-    entries = table->scale_array->entries;                                    \
+    hash##name##_entry_t** entries = table->scale_array->entries;             \
     uint64_t i = index;                                                       \
     uint64_t lookup = 0;                                                      \
     uint64_t step = 0;                                                        \
@@ -322,9 +331,9 @@ __string_hashcode(const char* s)
         i = 0;                                                                \
       }                                                                       \
       if (__is_set(table->scale_array->flags, i)) {                           \
-        if (feq(entries[i], key)) {                                           \
+        if (feq((*entries[i]), key)) {                                        \
           *found = 1;                                                         \
-          return &entries[i];                                                 \
+          return entries[i];                                                  \
         }                                                                     \
         lookup++;                                                             \
       }                                                                       \
@@ -336,19 +345,17 @@ __string_hashcode(const char* s)
   static inline hash##name##_entry_t* hash##name##_get(hash##name##_t* table, \
                                                        ktype key, int* found) \
   {                                                                           \
-    int from;                                                                 \
-    return hash##name##_get_with_from(table, key, found, &from);              \
+    return hash##name##_get_with_from(table, key, found);                     \
   }                                                                           \
   static inline hash##name##_entry_t* __hash##name##_put(                     \
       hash##name##_t* table, hash##name##_entry_t* entry, int replace,        \
-      int* exist, int* from)                                                  \
+      int* exist)                                                             \
   {                                                                           \
     uint64_t h = fhash(entry->key);                                           \
     _hash##name##_array_t* array_list = table->array;                         \
     hash##name##_entry_t* entries;                                            \
     ktype key = entry->key;                                                   \
     *exist = 0;                                                               \
-    *from = 0;                                                                \
     for (int i = 0; i < table->m; i++) {                                      \
       entries = array_list[i].entries;                                        \
       uint64_t index = h % array_list[i].mask;                                \
@@ -358,7 +365,6 @@ __string_hashcode(const char* s)
             memcpy(entries + index, entry, sizeof(hash##name##_entry_t));     \
           }                                                                   \
           *exist = 1;                                                         \
-          *from = 1;                                                          \
           return &entries[index];                                             \
         }                                                                     \
         continue;                                                             \
@@ -367,7 +373,6 @@ __string_hashcode(const char* s)
       array_list[i].size++;                                                   \
       memcpy(entries + index, entry, sizeof(hash##name##_entry_t));           \
       __set(array_list[i].flags, index);                                      \
-      *from = 1;                                                              \
       return &entries[index];                                                 \
     }                                                                         \
     _hash##name##_scale_array_t* scale_array = table->scale_array;            \
@@ -377,19 +382,19 @@ __string_hashcode(const char* s)
       uint64_t new_cap = __roundup64__(scale_array->capacity + 1);            \
       assert(new_cap > old_cap);                                              \
       uint64_t* flags = scale_array->flags;                                   \
-      hash##name##_entry_t* entries = scale_array->entries;                   \
+      hash##name##_entry_t** entries = scale_array->entries;                  \
       scale_array->flags =                                                    \
           (uint64_t*)hmalloc(sizeof(uint64_t) * (new_cap + 63) / 64);         \
       memset(scale_array->flags, 0, sizeof(uint64_t) * (new_cap + 63) / 64);  \
-      scale_array->entries = (hash##name##_entry_t*)hmalloc(                  \
-          sizeof(hash##name##_entry_t) * new_cap);                            \
+      scale_array->entries = (hash##name##_entry_t**)hmalloc(                 \
+          sizeof(hash##name##_entry_t*) * new_cap);                           \
       memset(scale_array->entries, 0,                                         \
-             sizeof(hash##name##_entry_t) * new_cap);                         \
+             sizeof(hash##name##_entry_t*) * new_cap);                        \
       for (uint64_t i = 0; i < old_cap; i++) {                                \
         if (!__is_set(flags, i)) {                                            \
           continue;                                                           \
         }                                                                     \
-        uint64_t index = fhash(entries[i].key) % (new_cap - 1);               \
+        uint64_t index = fhash(entries[i]->key) % (new_cap - 1);              \
         if (__is_set(scale_array->flags, index)) {                            \
           uint64_t j = index;                                                 \
           uint64_t start = index;                                             \
@@ -399,8 +404,7 @@ __string_hashcode(const char* s)
             }                                                                 \
             if (!__is_set(scale_array->flags, j)) {                           \
               __set(scale_array->flags, j);                                   \
-              memcpy(scale_array->entries + j, entries + i,                   \
-                     sizeof(hash##name##_entry_t));                           \
+              scale_array->entries[j] = entries[i];                           \
               break;                                                          \
             }                                                                 \
             j++;                                                              \
@@ -410,8 +414,7 @@ __string_hashcode(const char* s)
           }                                                                   \
         } else {                                                              \
           __set(scale_array->flags, index);                                   \
-          memcpy(scale_array->entries + index, entries + i,                   \
-                 sizeof(hash##name##_entry_t));                               \
+          scale_array->entries[index] = entries[i];                           \
         }                                                                     \
       }                                                                       \
       hfree(flags, sizeof(uint64_t) * (old_cap + 63) / 64);                   \
@@ -419,28 +422,36 @@ __string_hashcode(const char* s)
       scale_array->capacity = new_cap;                                        \
     }                                                                         \
     uint64_t index = h % (scale_array->capacity - 1);                         \
-    entries = scale_array->entries;                                           \
-    uint64_t i = index;                                                       \
-    while (1) {                                                               \
-      if (i >= scale_array->capacity) {                                       \
-        i = 0;                                                                \
-      }                                                                       \
-      if (__is_set(scale_array->flags, i)) {                                  \
-        if (feq(entries[i], key)) {                                           \
-          if (replace) {                                                      \
-            memcpy(entries + i, entry, sizeof(hash##name##_entry_t));         \
-          }                                                                   \
-          *exist = 1;                                                         \
-          return &entries[i];                                                 \
+    {                                                                         \
+      hash##name##_entry_t** entries = scale_array->entries;                  \
+      uint64_t i = index;                                                     \
+      while (1) {                                                             \
+        if (i >= scale_array->capacity) {                                     \
+          i = 0;                                                              \
         }                                                                     \
-        i++;                                                                  \
-        continue;                                                             \
+        if (__is_set(scale_array->flags, i)) {                                \
+          if (feq((*entries[i]), key)) {                                      \
+            if (replace) {                                                    \
+              hash##name##_entry_t* e = (hash##name##_entry_t*)hash_malloc(   \
+                  sizeof(hash##name##_entry_t));                              \
+              memcpy(e, entry, sizeof(hash##name##_entry_t));                 \
+              entries[i] = e;                                                 \
+            }                                                                 \
+            *exist = 1;                                                       \
+            return entries[i];                                                \
+          }                                                                   \
+          i++;                                                                \
+          continue;                                                           \
+        }                                                                     \
+        __set(scale_array->flags, i);                                         \
+        scale_array->size++;                                                  \
+        table->size++;                                                        \
+        hash##name##_entry_t* e =                                             \
+            (hash##name##_entry_t*)hash_malloc(sizeof(hash##name##_entry_t)); \
+        memcpy(e, entry, sizeof(hash##name##_entry_t));                       \
+        entries[i] = e;                                                       \
+        return entries[i];                                                    \
       }                                                                       \
-      __set(scale_array->flags, i);                                           \
-      scale_array->size++;                                                    \
-      table->size++;                                                          \
-      memcpy(&scale_array->entries[i], entry, sizeof(hash##name##_entry_t));  \
-      return &entries[i];                                                     \
     }                                                                         \
     return NULL;                                                              \
   }                                                                           \
@@ -448,14 +459,13 @@ __string_hashcode(const char* s)
       hash##name##_t* table, hash##name##_entry_t* entry)                     \
   {                                                                           \
     int exist;                                                                \
-    int from;                                                                 \
-    return __hash##name##_put(table, entry, 1, &exist, &from);                \
+    return __hash##name##_put(table, entry, 1, &exist);                       \
   }                                                                           \
   static inline hash##name##_entry_t* hash##name##_put_if_not(                \
       hash##name##_t* table, hash##name##_entry_t* entry, int replace,        \
-      int* exist, int* from)                                                  \
+      int* exist)                                                             \
   {                                                                           \
-    return __hash##name##_put(table, entry, replace, exist, from);            \
+    return __hash##name##_put(table, entry, replace, exist);                  \
   }                                                                           \
   static inline hash##name##_entry_t* hash##name##_iter(                      \
       hash##name##_t* table)                                                  \
@@ -494,7 +504,7 @@ __string_hashcode(const char* s)
       return NULL;                                                            \
     }                                                                         \
     _hash##name##_scale_array_t* scale_array = table->scale_array;            \
-    hash##name##_entry_t* entries = scale_array->entries;                     \
+    hash##name##_entry_t** entries = scale_array->entries;                    \
     while (!__is_set(scale_array->flags, table->iter.offset)                  \
            && table->iter.offset < scale_array->capacity) {                   \
       table->iter.offset++;                                                   \
@@ -504,7 +514,7 @@ __string_hashcode(const char* s)
       return NULL;                                                            \
     }                                                                         \
     table->iter.size++;                                                       \
-    return &entries[table->iter.offset++];                                    \
+    return entries[table->iter.offset++];                                     \
   }
 
 #define define_hashtable(name, ktype, vtype, feq, fhash)                      \
