@@ -1,0 +1,4 @@
+#! /bin/bash
+
+ARG1=$1
+valgrind --leak-check=full --leak-check=full --show-leak-kinds=all --log-file=./1.log --track-origins=yes $ARG1
