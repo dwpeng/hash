@@ -32,7 +32,7 @@ __lh3_Jenkins_hash_int(uint32_t key)
   key ^= (key >> 12);
   return key;
 }
-#define hash_equal(entry, b) ((a).key == (b))
+#define hash_equal(a, b) (a == b)
 #define hash_hash(key) __lh3_Jenkins_hash_int(key)
 
 // Step2: define hashtable
@@ -92,7 +92,7 @@ typedef struct {
   char name;
 } person_t;
 
-#define int_eq(entry, b) ((entry).key == (b))
+#define int_eq(a, b) (b == b)
 #define int_hash(a) (__lh3_Jenkins_hash_int(a))
 define_hashtable(person, int, person_t*, int_eq, int_hash);
 
