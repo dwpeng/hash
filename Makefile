@@ -2,7 +2,7 @@ cc := gcc
 INC := -I./
 CFLAGS := -Wall -Wextra -Werror -O3 -g $(INC)
 
-all: test-main test-cc test-thread test-set test-linear-probe test-mmap test-iter
+all: test-main test-cc test-thread test-set test-linear-probe test-mmap test-iter test-set-to-linear
 
 test-main:
 	$(cc) $(CFLAGS) -o test-main test/test.c
@@ -25,7 +25,10 @@ test-mmap:
 test-iter:
 	$(cc) $(CFLAGS) -o test-iter test/test-iter.c
 
+test-set-to-linear:
+	$(cc) $(CFLAGS) -o test-set-to-linear test/test-set-to-linear.c
+
 .PHONY: clean
 
 clean:
-	rm -f test-main test-cc test-thread test-set test-linear-probe test-mmap
+	rm -f test-*
