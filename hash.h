@@ -331,7 +331,7 @@ __string_hashcode(const char* s)
         i = 0;                                                                \
       }                                                                       \
       if (__is_set(table->scale_array->flags, i)) {                           \
-        if (feq((entries[i]->key), key)) {                                        \
+        if (feq(entries[i]->key, key)) {                                        \
           *found = 1;                                                         \
           return entries[i];                                                  \
         }                                                                     \
@@ -430,7 +430,7 @@ __string_hashcode(const char* s)
           i = 0;                                                              \
         }                                                                     \
         if (__is_set(scale_array->flags, i)) {                                \
-          if (feq((entries[i]->key), key)) {                                      \
+          if (feq(entries[i]->key, key)) {                                      \
             if (replace) {                                                    \
               hash##name##_entry_t* e = (hash##name##_entry_t*)hash_malloc(   \
                   sizeof(hash##name##_entry_t));                              \
@@ -549,19 +549,19 @@ __string_hashcode(const char* s)
 extern "C" {
 #endif
 
-#define ii_eq(key1, key2) (key1 == key2)
+#define ii_eq(key1, key2) ((key1) == (key2))
 #define ii_hash(key) __lh3_Jenkins_hash_int(key)
 define_hashtable(ii, int, int, ii_eq, ii_hash);
 
-#define ll_eq(key1, key2) (key1 == key2)
+#define ll_eq(key1, key2) ((key1) == (key2))
 #define ll_hash(key) __lh3_Jenkins_hash_64(key)
 define_hashtable(ll, int64_t, int64_t, ll_eq, ll_hash);
 
-#define si_eq(key1, key2) (strcmp(key1, key2) == 0)
+#define si_eq(key1, key2) (strcmp((key1), (key2)) == 0)
 #define si_hash(key) __string_hashcode(key)
 define_hashtable(si, char*, int, si_eq, si_hash);
 
-#define ss_eq(key1, key2) (strcmp(key1, key2) == 0)
+#define ss_eq(key1, key2) (strcmp((key1), (key2)) == 0)
 #define ss_hash(key) __string_hashcode(key)
 define_hashtable(ss, char*, char*, ss_eq, ss_hash);
 
