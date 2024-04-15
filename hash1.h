@@ -12,22 +12,6 @@
 
 #define LOAD 0.75 // default load factor
 
-#if defined(HASH_MMAP) && defined(__linux__)
-#include <sys/mman.h>
-#ifndef MAP_ANONYMOUS
-#define MAP_ANONYMOUS MAP_ANON
-#endif
-#ifndef MAP_ANON
-#define MAP_ANON 0x20
-#endif
-#define hmalloc(size)                                                         \
-  mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
-#define hfree(ptr, size) munmap(ptr, size)
-#else
-#define hmalloc(size) hash_malloc(size)
-#define hfree(ptr, size) hash_free(ptr)
-#endif
-
 #define __define_hash_table_entry(name, ktype, vtype)                         \
   typedef struct {                                                            \
     ktype key;                                                                \
@@ -42,27 +26,62 @@
 #define __is_set(flags, index) (((flags)[(index) / 64] >> ((index) % 64)) & 1)
 #define __set(flags, index) ((flags)[(index) / 64] |= (1LLU << ((index) % 64)))
 
+#define OFFSET_BITS 24
+#define MAX_OFFSET_SIZE (1 << OFFSET_BITS)
+
 #define __define_hash(name, ktype, vtype)                                     \
+  typedef struct __hash##name##raw_entries_t __hash##name##raw_entries_t;     \
+  struct __hash##name##raw_entries_t {                                        \
+    hash##name##_entry_t* entries;                                            \
+    uint64_t capacity;                                                        \
+    uint64_t offset;                                                          \
+  };                                                                          \
   typedef struct {                                                            \
     uint64_t size;                                                            \
-    uint64_t capacity;                                                        \
+    float load_factor;                                                        \
     uint64_t* flags;                                                          \
     struct {                                                                  \
-      hash##name##_entry_t* entry;                                            \
-      uint64_t offset;                                                        \
+      __hashxxxxxraw_entries_t** entries;                                     \
+      int block_index;                                                        \
+      int nblocks;                                                            \
       uint64_t capacity;                                                      \
     } raw;                                                                    \
     uint32_t* entries;                                                        \
   } hash##name##_t;
+
+// memory layout
+// flags: 64 bits * length per entry, 1 bit per entry
+// raw
+//            +------+------+------+------+------+
+//  entries ->|  0   |   1  |   2  |      | .... |  -> i
+//            +------+------+------+------+------+
+//                              |
+//                         +--------+--------+
+//                         |   0    |   1    | .... -> j
+//                         +--------+--------+
+//                _____________|
+// entries       ||     0
+//            +--||--+------+------+------+------+
+//  entries ->|offset|      |      |      | .... |  -> i * MAX_OFFSET_SIZE + j
+//            +------+------+------+------+------+
 
 // for development
 // ---------------------------------------
 typedef int ktype;
 typedef int vtype;
 
-typedef uint64_t (*feq)(ktype, ktype);
-typedef uint64_t (*fhash)(ktype);
+static inline uint64_t
+feq(ktype a, ktype b)
+{
+  return a == b;
+}
+
+static inline uint64_t
+fhash(ktype key)
+{
+  return key;
+}
+
 __define_hash_table_entry(xxxxx, ktype, vtype);
 __define_hash(xxxxx, ktype, vtype);
 // ---------------------------------------
-
