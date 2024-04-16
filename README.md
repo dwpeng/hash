@@ -35,10 +35,10 @@ __lh3_Jenkins_hash_int(uint32_t key)
 #define hash_equal(a, b) (a == b)
 #define hash_hash(key) __lh3_Jenkins_hash_int(key)
 
-// Step2: define hashtable
+// Step2: define hashtable entry
+define_hashtable_entry(ii, int, int)
+// Step3: define hashtable
 define_hashtable(ii, int, int, hash_equal, hash_hash)
-// Step3: define hashset
-define_hashset(ii, int, hash_equal, hash_hash)
 ```
 
 ### methods of hashtable
@@ -49,16 +49,19 @@ int N = 1000000; // size
 int M = 5;       // layers
 hashtable_ii_t *h = hashtable_ii_init(N, M);
 
+int replace = false; // don't replace the value if the key exists
+int exist = 0;   // check if the key exists
 // put
 hashtable_ii_entry_t entry = {
   .key = 1,
   .value = 1
 };
-hashtable_ii_put(h, &entry);
-
+hashtable_ii_entry_t* e = NULL;
+e = hashtable_ii_put(h, &entry, replace, &exist);
+assert(e->key == 1 && e->value == 1 && exist == 0);
 // get 
-hashtable_ii_entry_t *entry = hashtable_ii_get(h, 1);
-
+hashtable_ii_entry_t *entry = hashtable_ii_get(h, 1, &exist);
+assert(entry->key == 1 && entry->value == 1 && exist == 1);
 // iter
 hashtable_ii_entry_t *el = NULL;
 while((el = hashtable_ii_iter(h, el))) {
@@ -78,55 +81,4 @@ git clone git@github.com:dwpeng/hash.git
 cd hash
 make
 ./test
-```
-
-## complex example
-```c
-#include "hash.h"
-#include <assert.h>
-#include <stdio.h>
-
-typedef struct {
-  char id[10];
-  int age;
-  char name;
-} person_t;
-
-#define int_eq(a, b) (b == b)
-#define int_hash(a) (__lh3_Jenkins_hash_int(a))
-define_hashtable(person, int, person_t*, int_eq, int_hash);
-
-int
-main()
-{
-  person_t persons[] = {
-    { "1", 10, 'a' },
-    { "2", 20, 'b' },
-    { "3", 30, 'c' },
-    { "4", 40, 'd' },
-    { "5", 50, 'e' },
-    { "6", 60, 'f' },
-    { "7", 70, 'g' },
-    { "8", 80, 'h' },
-    { "9", 90, 'i' },
-    { "10",100,'j' },
-  };
-  int N = 10;
-  int M = 5;
-  hashtable_person_t* table = hashtable_person_init(N, M);
-  hashtable_person_entry_t entry = { 0 };
-  for (int i = 0; i < N; i++) {
-    entry.key = i;
-    entry.value = &persons[i];
-    hashtable_person_put(table, &entry);
-  }
-  for (int i = 0; i < N; i++) {
-    int found = 0;
-    hashtable_person_entry_t* e = hashtable_person_get(table, i, &found);
-    assert(found);
-    assert(persons[i].age == e->value->age);
-    printf("person[%s]: %d\n", e->value->id, e->value->age);
-  }
-  hashtable_person_free(table);
-}
 ```
