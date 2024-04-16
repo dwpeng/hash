@@ -20,10 +20,11 @@ thread_insert(data_t* data)
          data->start, data->end, pthread_self());
   pthread_mutex_unlock(data->lock);
   hashtable_ii_entry_t entry = { 0 };
+  int exist = 0;
   for (int i = data->start; i < data->end; i++) {
     entry.key = i;
     entry.value = i;
-    hashtable_ii_put(data->h, &entry);
+    hashtable_ii_put(data->h, &entry, 0, &exist);
   }
   return NULL;
 }
@@ -37,7 +38,7 @@ main()
   data_t** tasks = malloc(ntasks * sizeof(data_t*));
   for (int i = 0; i < ntasks; i++) {
     tasks[i] = malloc(sizeof(data_t));
-    tasks[i]->h = hashtable_ii_init(100, 1);
+    tasks[i]->h = hashtable_ii_with_capacity(1000, 5, 0.75);
     tasks[i]->start = i * 250000;
     tasks[i]->end = (i + 1) * 250000;
     tasks[i]->task_id = i;

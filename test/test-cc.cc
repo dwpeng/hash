@@ -8,12 +8,14 @@ test()
 {
   int N = 100000;
   int M = 5;
-  hashtable_ii_t* table = hashtable_ii_init(N, M);
+  hashtable_ii_t* table = hashtable_ii_with_capacity(N, M, 0.8);
   hashtable_ii_entry_t entry = { 0, 0 };
+  int replace = 0;
+  int exist = 0;
   for (int i = 0; i < N; i++) {
     entry.key = i;
     entry.value = i;
-    hashtable_ii_put(table, &entry);
+    hashtable_ii_put(table, &entry, replace, &exist);
   }
   hashtable_ii_entry_t* e = NULL;
   int found = 0;
