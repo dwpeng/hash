@@ -3,7 +3,6 @@
 
 #include "hash-base.h"
 
-
 #define __define_lphash(name, ktype, vtype)                                   \
   typedef struct __lphash##name##_raw_entries_t                               \
       __lphash##name##_raw_entries_t;                                         \
@@ -24,6 +23,10 @@
       uint64_t mask;                                                          \
       uint64_t block_size;                                                    \
     } raw;                                                                    \
+    struct {                                                                  \
+      int block_index;                                                        \
+      uint64_t offset;                                                        \
+    } iter;                                                                   \
     uint32_t* entries;                                                        \
   } lphash##name##_t
 
@@ -69,6 +72,8 @@
       table->raw.entries[i]->entries = (hash##name##_entry_t*)hash_malloc(    \
           sizeof(hash##name##_entry_t) * block_size);                         \
     }                                                                         \
+    table->iter.block_index = 0;                                              \
+    table->iter.offset = 0;                                                   \
     table->flags =                                                            \
         (uint64_t*)hash_malloc(sizeof(uint64_t) * (capacity + 63) / 64);      \
     memset(table->flags, 0, sizeof(uint64_t) * (capacity + 63) / 64);         \
@@ -91,6 +96,12 @@
     memset(table->flags, 0,                                                   \
            sizeof(uint64_t) * (table->raw.capacity + 63) / 64);               \
     table->size = 0;                                                          \
+    table->raw.block_index = 0;                                               \
+    table->iter.block_index = 0;                                              \
+    table->iter.offset = 0;                                                   \
+    for (int i = 0; i < table->raw.nblocks; i++) {                            \
+      table->raw.entries[i]->offset = 0;                                      \
+    }                                                                         \
   }                                                                           \
   static inline void lphash##name##_resize(lphash##name##_t* table)           \
   {                                                                           \
@@ -191,6 +202,20 @@
       h = (h + 1) & table->raw.mask;                                          \
     }                                                                         \
     return NULL;                                                              \
+  }                                                                           \
+  static inline hash##name##_entry_t* lphash##name##_iter(                    \
+      lphash##name##_t* table)                                                \
+  {                                                                           \
+    if (table->iter.block_index >= table->raw.nblocks) {                      \
+      return NULL;                                                            \
+    }                                                                         \
+    __lphash##name##_raw_entries_t* block =                                   \
+        table->raw.entries[table->iter.block_index];                          \
+    if (table->iter.offset >= block->offset) {                                \
+      table->iter.block_index++;                                              \
+      return lphash##name##_iter(table);                                      \
+    }                                                                         \
+    return &block->entries[table->iter.offset++];                             \
   }
 
 #define define_lphashtable(name, ktype, vtype, feq, fhash)                    \
@@ -208,6 +233,9 @@
 #define lphashtable_free(name, table)                                 lphashtable_##name##_free(table)
 #define lphashtable_get(name, table, key, found)                      lphashtable_##name##_get(table, key, found)
 #define lphashtable_put(name, table, entry)                           lphashtable_##name##_put(table, entry)
+#define lphashtable_clear(name, table)                                lphashtable_##name##_clear(table)
+#define lphashtable_resize(name, table)                               lphashtable_##name##_resize(table)
+#define lphashtable_iter(name, table)                                 lphashtable_##name##_iter(table)
 // clang-format on
 
 // clang-format off
@@ -215,6 +243,9 @@
 #define lphashset_free(name, table)                                   lphashset_##name##_free(table)
 #define lphashset_get(name, table, key, found)                        lphashset_##name##_get(table, key, found)
 #define lphashset_put(name, table, entry)                             lphashset_##name##_put(table, entry)
+#define lphashset_clear(name, table)                                  lphashset_##name##_clear(table)
+#define lphashset_resize(name, table)                                 lphashset_##name##_resize(table)
+#define lphashset_iter(name, table)                                   lphashset_##name##_iter(table)
 // clang-format on
 
 #ifdef __cplusplus
