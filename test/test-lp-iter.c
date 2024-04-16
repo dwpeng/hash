@@ -18,5 +18,14 @@ main()
     assert(e->key == count);
     count++;
   }
+  assert(count == 1000);
+  lphashtable_ii_reset_iter(t);
+  count = 0;
+  while((e = lphashtable_ii_iter(t)) != NULL) {
+    assert(e->key == e->value);
+    assert(e->key == count);
+    count++;
+  }
+  assert(count == 1000);
   lphashtable_ii_free(t);
 }

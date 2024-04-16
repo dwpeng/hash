@@ -216,6 +216,11 @@
       return lphash##name##_iter(table);                                      \
     }                                                                         \
     return &block->entries[table->iter.offset++];                             \
+  }                                                                           \
+  static inline void lphash##name##_reset_iter(lphash##name##_t* table)       \
+  {                                                                           \
+    table->iter.block_index = 0;                                              \
+    table->iter.offset = 0;                                                   \
   }
 
 #define define_lphashtable(name, ktype, vtype, feq, fhash)                    \
@@ -236,6 +241,7 @@
 #define lphashtable_clear(name, table)                                lphashtable_##name##_clear(table)
 #define lphashtable_resize(name, table)                               lphashtable_##name##_resize(table)
 #define lphashtable_iter(name, table)                                 lphashtable_##name##_iter(table)
+#define lphashtable_reset_iter(name, table)                           lphashtable_##name##_reset_iter(table)
 // clang-format on
 
 // clang-format off
@@ -246,6 +252,7 @@
 #define lphashset_clear(name, table)                                  lphashset_##name##_clear(table)
 #define lphashset_resize(name, table)                                 lphashset_##name##_resize(table)
 #define lphashset_iter(name, table)                                   lphashset_##name##_iter(table)
+#define lphashset_reset_iter(name, table)                             lphashset_##name##_reset_iter(table)
 // clang-format on
 
 #ifdef __cplusplus
