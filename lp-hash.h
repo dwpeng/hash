@@ -213,6 +213,7 @@
         table->raw.entries[table->iter.block_index];                          \
     if (table->iter.offset >= block->offset) {                                \
       table->iter.block_index++;                                              \
+      table->iter.offset = 0;                                                 \
       return lphash##name##_iter(table);                                      \
     }                                                                         \
     return &block->entries[table->iter.offset++];                             \
