@@ -100,17 +100,10 @@ __hash_prime_bigger(uint64_t size)
   } _hash##name##_array_t;                                                    \
   typedef struct {                                                            \
     uint64_t size;                                                            \
-    uint64_t capacity;                                                        \
-    uint64_t* flags;                                                          \
-    hash##name##_entry_t** entries;                                           \
-  } _hash##name##_scale_array_t;                                              \
-  typedef struct hash##name##_t hash##name##_t;                               \
-  struct hash##name##_t {                                                     \
-    uint64_t size;                                                            \
     int m;                                                                    \
     float load;                                                               \
     _hash##name##_array_t* array;                                             \
-    _hash##name##_scale_array_t* scale_array;                                 \
+    lphash##name##_t* linear;                                                 \
     struct {                                                                  \
       uint64_t offset;                                                        \
       uint64_t size;                                                          \
@@ -118,17 +111,17 @@ __hash_prime_bigger(uint64_t size)
       int m;                                                                  \
       int type;                                                               \
     } iter;                                                                   \
-  };
+  } hash##name##_t;
 
 #define __define_hash_method(name, feq, fhash, ktype, vtype)                  \
-  static inline hash##name##_t* hash##name##_init_with_load(                  \
-      size_t max_size, int m, float load)                                     \
+  static inline hash##name##_t* hash##name##_with_capacity(uint64_t capacity, \
+                                                           int m, float load) \
   {                                                                           \
     assert(load > 0 && load < 1);                                             \
-    max_size = max_size < 128 ? 128 : max_size;                               \
+    capacity = capacity < 128 ? 128 : capacity;                               \
     m = m < 2 ? 2 : m;                                                        \
     int n = 0;                                                                \
-    __hash_prime(max_size, &n);                                               \
+    __hash_prime(capacity, &n);                                               \
     uint64_t size_list[60] = { 0 };                                           \
     if (m > n) {                                                              \
       m = n;                                                                  \
@@ -157,25 +150,13 @@ __hash_prime_bigger(uint64_t size)
       table->array[i].entries = (hash##name##_entry_t*)hash_malloc(           \
           sizeof(hash##name##_entry_t) * size_list[i]);                       \
     }                                                                         \
-    table->scale_array = (_hash##name##_scale_array_t*)hash_malloc(           \
-        sizeof(_hash##name##_scale_array_t));                                 \
-    table->scale_array->entries = (hash##name##_entry_t**)hash_malloc(        \
-        sizeof(hash##name##_entry_t*) * 128);                                 \
-    table->scale_array->capacity = 128;                                       \
-    table->scale_array->flags =                                               \
-        (uint64_t*)hash_malloc(sizeof(uint64_t) * (128 + 63) / 64);           \
-    memset(table->scale_array->flags, 0, sizeof(uint64_t) * (128 + 63) / 64); \
-    table->scale_array->size = 0;                                             \
+    table->linear = lphash##name##_with_capacity(1024, 1024 * 128, load);     \
     table->iter.offset = 0;                                                   \
     table->iter.status = 0;                                                   \
     table->iter.m = 0;                                                        \
     table->iter.type = 0;                                                     \
     table->iter.size = 0;                                                     \
     return table;                                                             \
-  }                                                                           \
-  static inline hash##name##_t* hash##name##_init(size_t max_size, int m)     \
-  {                                                                           \
-    return hash##name##_init_with_load(max_size, m, HASH_LOAD_FACTOR);        \
   }                                                                           \
   static inline void hash##name##_free(hash##name##_t* table)                 \
   {                                                                           \
@@ -184,18 +165,11 @@ __hash_prime_bigger(uint64_t size)
       hash_free(table->array[i].flags);                                       \
     }                                                                         \
     hash_free(table->array);                                                  \
-    for (uint64_t i = 0; i < table->scale_array->capacity; i++) {             \
-      if (__is_set(table->scale_array->flags, i)) {                           \
-        hash_free(table->scale_array->entries[i]);                            \
-      }                                                                       \
-    }                                                                         \
-    hash_free(table->scale_array->entries);                                   \
-    hash_free(table->scale_array->flags);                                     \
-    hash_free(table->scale_array);                                            \
+    lphash##name##_free(table->linear);                                       \
     hash_free(table);                                                         \
   }                                                                           \
-  static inline hash##name##_entry_t* hash##name##_get_with_from(             \
-      hash##name##_t* table, ktype key, int* found)                           \
+  static inline hash##name##_entry_t* hash##name##_get(hash##name##_t* table, \
+                                                       ktype key, int* found) \
   {                                                                           \
     uint64_t h = fhash(key);                                                  \
     _hash##name##_array_t* array = table->array;                              \
@@ -218,39 +192,12 @@ __hash_prime_bigger(uint64_t size)
         }                                                                     \
       }                                                                       \
     }                                                                         \
-    if (table->scale_array->size == 0) {                                      \
+    if (table->linear->size == 0) {                                           \
       return NULL;                                                            \
     }                                                                         \
-    uint64_t index = h % (table->scale_array->capacity - 1);                  \
-    hash##name##_entry_t** entries = table->scale_array->entries;             \
-    uint64_t i = index;                                                       \
-    uint64_t lookup = 0;                                                      \
-    uint64_t step = 0;                                                        \
-    while (step <= table->scale_array->capacity) {                            \
-      if (lookup >= table->scale_array->size) {                               \
-        break;                                                                \
-      }                                                                       \
-      if (i >= table->scale_array->capacity) {                                \
-        i = 0;                                                                \
-      }                                                                       \
-      if (__is_set(table->scale_array->flags, i)) {                           \
-        if (feq(entries[i]->key, key)) {                                      \
-          *found = 1;                                                         \
-          return entries[i];                                                  \
-        }                                                                     \
-        lookup++;                                                             \
-      }                                                                       \
-      i++;                                                                    \
-      step++;                                                                 \
-    }                                                                         \
-    return NULL;                                                              \
+    return lphash##name##_get(table->linear, key, found);                     \
   }                                                                           \
-  static inline hash##name##_entry_t* hash##name##_get(hash##name##_t* table, \
-                                                       ktype key, int* found) \
-  {                                                                           \
-    return hash##name##_get_with_from(table, key, found);                     \
-  }                                                                           \
-  static inline hash##name##_entry_t* __hash##name##_put(                     \
+  static inline hash##name##_entry_t* hash##name##_put(                       \
       hash##name##_t* table, hash##name##_entry_t* entry, int replace,        \
       int* exist)                                                             \
   {                                                                           \
@@ -278,97 +225,11 @@ __hash_prime_bigger(uint64_t size)
       __set(array_list[i].flags, index);                                      \
       return &entries[index];                                                 \
     }                                                                         \
-    _hash##name##_scale_array_t* scale_array = table->scale_array;            \
-    if ((double)scale_array->size / (double)scale_array->capacity             \
-        > table->load) {                                                      \
-      uint64_t old_cap = scale_array->capacity;                               \
-      uint64_t new_cap = __hash_roundup64_dwp__(scale_array->capacity + 1);   \
-      assert(new_cap > old_cap);                                              \
-      uint64_t* flags = scale_array->flags;                                   \
-      hash##name##_entry_t** entries = scale_array->entries;                  \
-      scale_array->flags =                                                    \
-          (uint64_t*)hash_malloc(sizeof(uint64_t) * (new_cap + 63) / 64);     \
-      memset(scale_array->flags, 0, sizeof(uint64_t) * (new_cap + 63) / 64);  \
-      scale_array->entries = (hash##name##_entry_t**)hash_malloc(             \
-          sizeof(hash##name##_entry_t*) * new_cap);                           \
-      memset(scale_array->entries, 0,                                         \
-             sizeof(hash##name##_entry_t*) * new_cap);                        \
-      for (uint64_t i = 0; i < old_cap; i++) {                                \
-        if (!__is_set(flags, i)) {                                            \
-          continue;                                                           \
-        }                                                                     \
-        uint64_t index = fhash(entries[i]->key) % (new_cap - 1);              \
-        if (__is_set(scale_array->flags, index)) {                            \
-          uint64_t j = index;                                                 \
-          uint64_t start = index;                                             \
-          while (1) {                                                         \
-            if (j >= new_cap) {                                               \
-              j = 0;                                                          \
-            }                                                                 \
-            if (!__is_set(scale_array->flags, j)) {                           \
-              __set(scale_array->flags, j);                                   \
-              scale_array->entries[j] = entries[i];                           \
-              break;                                                          \
-            }                                                                 \
-            j++;                                                              \
-            if (j == start) {                                                 \
-              break;                                                          \
-            }                                                                 \
-          }                                                                   \
-        } else {                                                              \
-          __set(scale_array->flags, index);                                   \
-          scale_array->entries[index] = entries[i];                           \
-        }                                                                     \
-      }                                                                       \
-      hash_free(flags);                                                       \
-      hash_free(entries);                                                     \
-      scale_array->capacity = new_cap;                                        \
+    entries = lphash##name##_put(table->linear, entry, replace, exist);       \
+    if (!*exist) {                                                            \
+      table->size++;                                                          \
     }                                                                         \
-    uint64_t index = h % (scale_array->capacity - 1);                         \
-    {                                                                         \
-      hash##name##_entry_t** entries = scale_array->entries;                  \
-      uint64_t i = index;                                                     \
-      while (1) {                                                             \
-        if (i >= scale_array->capacity) {                                     \
-          i = 0;                                                              \
-        }                                                                     \
-        if (__is_set(scale_array->flags, i)) {                                \
-          if (feq(entries[i]->key, key)) {                                    \
-            if (replace) {                                                    \
-              hash##name##_entry_t* e = (hash##name##_entry_t*)hash_malloc(   \
-                  sizeof(hash##name##_entry_t));                              \
-              memcpy(e, entry, sizeof(hash##name##_entry_t));                 \
-              entries[i] = e;                                                 \
-            }                                                                 \
-            *exist = 1;                                                       \
-            return entries[i];                                                \
-          }                                                                   \
-          i++;                                                                \
-          continue;                                                           \
-        }                                                                     \
-        __set(scale_array->flags, i);                                         \
-        scale_array->size++;                                                  \
-        table->size++;                                                        \
-        hash##name##_entry_t* e =                                             \
-            (hash##name##_entry_t*)hash_malloc(sizeof(hash##name##_entry_t)); \
-        memcpy(e, entry, sizeof(hash##name##_entry_t));                       \
-        entries[i] = e;                                                       \
-        return entries[i];                                                    \
-      }                                                                       \
-    }                                                                         \
-    return NULL;                                                              \
-  }                                                                           \
-  static inline hash##name##_entry_t* hash##name##_put(                       \
-      hash##name##_t* table, hash##name##_entry_t* entry)                     \
-  {                                                                           \
-    int exist;                                                                \
-    return __hash##name##_put(table, entry, 1, &exist);                       \
-  }                                                                           \
-  static inline hash##name##_entry_t* hash##name##_put_if_not(                \
-      hash##name##_t* table, hash##name##_entry_t* entry, int replace,        \
-      int* exist)                                                             \
-  {                                                                           \
-    return __hash##name##_put(table, entry, replace, exist);                  \
+    return entries;                                                           \
   }                                                                           \
   static inline hash##name##_entry_t* hash##name##_iter(                      \
       hash##name##_t* table)                                                  \
@@ -402,22 +263,17 @@ __hash_prime_bigger(uint64_t size)
         return &entries[table->iter.offset++];                                \
       }                                                                       \
     }                                                                         \
-    if (!table->scale_array->size) {                                          \
+    if (!table->linear->size) {                                               \
       table->iter.status = 1;                                                 \
       return NULL;                                                            \
     }                                                                         \
-    _hash##name##_scale_array_t* scale_array = table->scale_array;            \
-    hash##name##_entry_t** entries = scale_array->entries;                    \
-    while (!__is_set(scale_array->flags, table->iter.offset)                  \
-           && table->iter.offset < scale_array->capacity) {                   \
-      table->iter.offset++;                                                   \
-    }                                                                         \
-    if (table->iter.offset == scale_array->capacity) {                        \
+    hash##name##_entry_t* entry = lphash##name##_iter(table->linear);         \
+    if (entry) {                                                              \
+      table->iter.size++;                                                     \
+    } else {                                                                  \
       table->iter.status = 1;                                                 \
-      return NULL;                                                            \
     }                                                                         \
-    table->iter.size++;                                                       \
-    return entries[table->iter.offset++];                                     \
+    return entry;                                                             \
   }
 
 #define define_hashtable(name, ktype, vtype, feq, fhash)                      \
@@ -425,8 +281,7 @@ __hash_prime_bigger(uint64_t size)
   __define_hash_method(table_##name, feq, fhash, ktype, vtype);
 
 // clang-format off
-#define hashtable_init_with_load(name, max_size, m, load) hashtable_##name##_init_with_load(max_size, m, load)
-#define hashtable_init(name, max_size, m)        hashtable_##name##_init(max_size, m)
+#define hashtable_with_capacity(name, max_size, m, load) hashtable_##name##_with_capacity(max_size, m, load)
 #define hashtable_free(name, table)              hashtable_##name##_free(table)
 #define hashtable_get(name, table, key, found)   hashtable_##name##_get(table, key, found)
 #define hashtable_put(name, table, entry)        hashtable_##name##_put(table, entry)
@@ -438,8 +293,7 @@ __hash_prime_bigger(uint64_t size)
   __define_hash_method(set_##name, feq, fhash, ketype, NULL);
 
 // clang-format off
-#define hashset_init_with_load(name, max_size, m, load) hashset_##name##_init_with_load(max_size, m, load)
-#define hashset_init(name, max_size, m)          hashset_##name##_init(max_size, m)
+#define hashset_with_capacity(name, max_size, m, load) hashset_##name##_with_capacity(max_size, m, load)
 #define hashset_free(name, table)                hashset_##name##_free(table)
 #define hashset_get(name, table, key, found)     hashset_##name##_get(table, key, found)
 #define hashset_put(name, table, entry)          hashset_##name##_put(table, entry)
