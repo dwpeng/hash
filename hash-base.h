@@ -67,6 +67,13 @@ __string_hashcode(const char* s)
   return h;
 }
 
+#ifndef __is_set
+#define __is_set(flags, index) (((flags)[(index) / 64] >> ((index) % 64)) & 1)
+#endif
+#ifndef __set
+#define __set(flags, index) ((flags)[(index) / 64] |= (1LLU << ((index) % 64)))
+#endif
+
 #define __hash_eq_number(a, b) ((a) == (b))
 #define __hash_eq_string(a, b) (strcmp((a), (b)) == 0)
 #define __hash_hash_u32(key) __lh3_Jenkins_hash_int(key)

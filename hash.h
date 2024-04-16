@@ -119,9 +119,6 @@ __hash_prime_bigger(uint64_t size)
     } iter;                                                                   \
   };
 
-#define __is_set(flags, index) (((flags)[(index) / 64] >> ((index) % 64)) & 1)
-#define __set(flags, index) ((flags)[(index) / 64] |= (1LLU << ((index) % 64)))
-
 #define __define_hash_method(name, feq, fhash, ktype, vtype)                  \
   static inline hash##name##_t* hash##name##_init_with_load(                  \
       size_t max_size, int m, float load)                                     \

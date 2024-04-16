@@ -3,12 +3,6 @@
 
 #include "hash-base.h"
 
-#ifndef __is_set
-#define __is_set(flags, index) (((flags)[(index) / 64] >> ((index) % 64)) & 1)
-#endif
-#ifndef __set
-#define __set(flags, index) ((flags)[(index) / 64] |= (1LLU << ((index) % 64)))
-#endif
 
 #define __define_lphash(name, ktype, vtype)                                   \
   typedef struct __lphash##name##_raw_entries_t                               \
