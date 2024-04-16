@@ -8,7 +8,6 @@ language_map = {
 }
 
 
-
 def complie_file(src: str, exe_name: str, flags: list = [], deps: list = []):
     if not os.path.isfile(src):
         print(f"Error: {src} is not a file.")
@@ -56,8 +55,8 @@ if __name__ == "__main__":
         if os.path.exists(exe_name):
             os.remove(exe_name)
         try:
-          complie_file(os.path.join(test_dir, src), exe_name, flags, deps)
-        except:
-          print(f"Error: complie {src} failed.")
+            complie_file(os.path.join(test_dir, src), exe_name, flags, deps)
+        except Exception as e:
+            print(f"Error: complie {src} failed. {e}")
         else:
-          print(f"Success: complie \033[1;32m{src}\033[0m successfully.")
+            print(f"Complie \033[1;32m{src}\033[0m successfully.")
