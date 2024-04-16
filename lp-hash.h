@@ -114,9 +114,8 @@
     memset(table->flags, 0, sizeof(uint64_t) * (capacity + 63) / 64);         \
     table->entries =                                                          \
         (uint32_t*)hash_realloc(table->entries, sizeof(uint32_t) * capacity); \
-    memset(table->entries, 0, sizeof(uint32_t) * capacity);                   \
     uint64_t h;                                                               \
-    uint64_t mask = table->raw.mask;                                          \
+    uint64_t mask = capacity - 1;                                             \
     for (int i = 0; i < table->raw.nblocks; i++) {                            \
       __lphash##name##_raw_entries_t* block = table->raw.entries[i];          \
       for (uint64_t j = 0; j < block->offset; j++) {                          \
