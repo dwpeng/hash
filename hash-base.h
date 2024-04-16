@@ -72,4 +72,16 @@ __string_hashcode(const char* s)
 #define __hash_hash_u32(key) __lh3_Jenkins_hash_int(key)
 #define __hash_hash_u64(key) __lh3_Jenkins_hash_64(key)
 #define __hash_hash_string(key) __string_hashcode(key)
+
+#define __define_hash_table_entry(name, ktype, vtype)                         \
+  typedef struct {                                                            \
+    ktype key;                                                                \
+    vtype value;                                                              \
+  } hash##name##_entry_t;
+
+#define __define_hash_set_entry(name, ktype)                                  \
+  typedef struct {                                                            \
+    ktype key;                                                                \
+  } hash##name##_entry_t;
+
 #endif // __hash_base_h__

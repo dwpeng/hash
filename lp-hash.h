@@ -3,17 +3,6 @@
 
 #include "hash-base.h"
 
-#define __define_lphash_table_entry(name, ktype, vtype)                       \
-  typedef struct {                                                            \
-    ktype key;                                                                \
-    vtype value;                                                              \
-  } lphash##name##_entry_t
-
-#define __define_lphash_set_entry(name, ktype)                                \
-  typedef struct {                                                            \
-    ktype key;                                                                \
-  } lphash##name##_entry_t
-
 #ifndef __is_set
 #define __is_set(flags, index) (((flags)[(index) / 64] >> ((index) % 64)) & 1)
 #endif
@@ -25,7 +14,7 @@
   typedef struct __lphash##name##_raw_entries_t                               \
       __lphash##name##_raw_entries_t;                                         \
   struct __lphash##name##_raw_entries_t {                                     \
-    lphash##name##_entry_t* entries;                                          \
+    hash##name##_entry_t* entries;                                            \
     uint64_t capacity;                                                        \
     uint64_t offset;                                                          \
   };                                                                          \
@@ -83,8 +72,8 @@
           sizeof(__lphash##name##_raw_entries_t) * block_size);               \
       table->raw.entries[i]->capacity = block_size;                           \
       table->raw.entries[i]->offset = 0;                                      \
-      table->raw.entries[i]->entries = (lphash##name##_entry_t*)hash_malloc(  \
-          sizeof(lphash##name##_entry_t) * block_size);                       \
+      table->raw.entries[i]->entries = (hash##name##_entry_t*)hash_malloc(    \
+          sizeof(hash##name##_entry_t) * block_size);                         \
     }                                                                         \
     table->flags =                                                            \
         (uint64_t*)hash_malloc(sizeof(uint64_t) * (capacity + 63) / 64);      \
@@ -144,15 +133,15 @@
           sizeof(__lphash##name##_raw_entries_t) * block_size);               \
       table->raw.entries[i]->capacity = block_size;                           \
       table->raw.entries[i]->offset = 0;                                      \
-      table->raw.entries[i]->entries = (lphash##name##_entry_t*)hash_malloc(  \
-          sizeof(lphash##name##_entry_t) * block_size);                       \
+      table->raw.entries[i]->entries = (hash##name##_entry_t*)hash_malloc(    \
+          sizeof(hash##name##_entry_t) * block_size);                         \
     }                                                                         \
     table->raw.nblocks = nblocks;                                             \
     table->raw.capacity = capacity;                                           \
     table->raw.mask = capacity - 1;                                           \
   }                                                                           \
-  static inline lphash##name##_entry_t* lphash##name##_put(                   \
-      lphash##name##_t* table, lphash##name##_entry_t* entry, int replace,    \
+  static inline hash##name##_entry_t* lphash##name##_put(                     \
+      lphash##name##_t* table, hash##name##_entry_t* entry, int replace,      \
       int* exist)                                                             \
   {                                                                           \
     if (1.0 * table->size / table->raw.capacity > table->load_factor) {       \
@@ -192,7 +181,7 @@
                 ->entries[table->entries[h] % table->raw.block_size];         \
   }                                                                           \
                                                                               \
-  static inline lphash##name##_entry_t* lphash##name##_get(                   \
+  static inline hash##name##_entry_t* lphash##name##_get(                     \
       lphash##name##_t* table, ktype key, int* exist)                         \
   {                                                                           \
     *exist = 0;                                                               \
@@ -212,12 +201,12 @@
   }
 
 #define define_lphashtable(name, ktype, vtype, feq, fhash)                    \
-  __define_lphash_table_entry(table_##name, ktype, vtype);                    \
+  __define_hash_table_entry(table_##name, ktype, vtype);                      \
   __define_lphash(table_##name, ktype, vtype);                                \
   __define_lphash_method(table_##name, ktype, feq, fhash)
 
 #define define_lphashset(name, ktype, feq, fhash)                             \
-  __define_lphash_set_entry(set_##name, ktype);                               \
+  __define_hash_set_entry(set_##name, ktype);                                 \
   __define_lphash(set_##name, ktype, ktype);                                  \
   __define_lphash_method(set_##name, ktype, feq, fhash)
 

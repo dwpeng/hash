@@ -89,17 +89,6 @@ __hash_prime_bigger(uint64_t size)
   return 0;
 }
 
-#define __define_hash_table_entry(name, ktype, vtype)                         \
-  typedef struct {                                                            \
-    ktype key;                                                                \
-    vtype value;                                                              \
-  } hash##name##_entry_t;
-
-#define __define_hash_set_entry(name, ktype)                                  \
-  typedef struct {                                                            \
-    ktype key;                                                                \
-  } hash##name##_entry_t;
-
 #define __define_hash(name, ktype, vtype, feq, fhash)                         \
   typedef struct {                                                            \
     uint64_t mask;                                                            \
