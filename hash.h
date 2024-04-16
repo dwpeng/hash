@@ -276,7 +276,7 @@ __hash_prime_bigger(uint64_t size)
     return entry;                                                             \
   }
 
-#define define_hashtable(name, ktype, vtype, feq, fhash)                      \
+#define _define_hashtable(name, ktype, vtype, feq, fhash)                     \
   __define_hash(table_##name, ktype, vtype, feq, fhash);                      \
   __define_hash_method(table_##name, feq, fhash, ktype, vtype);
 
@@ -288,7 +288,7 @@ __hash_prime_bigger(uint64_t size)
 #define hashtable_iter(name, table)              hashtable_##name##_iter(table)
 // clang-format on
 
-#define define_hashset(name, ketype, feq, fhash)                              \
+#define _define_hashset(name, ketype, feq, fhash)                             \
   __define_hash(set_##name, ketype, NULL, feq, fhash);                        \
   __define_hash_method(set_##name, feq, fhash, ketype, NULL);
 
@@ -304,17 +304,36 @@ __hash_prime_bigger(uint64_t size)
 extern "C" {
 #endif
 
-define_hashtable(ii, int, int, __hash_eq_number, __hash_hash_u32);
-define_hashtable(ll, int64_t, int64_t, __hash_eq_number, __hash_hash_u64);
-define_hashtable(si, char*, int, __hash_eq_string, __hash_hash_string);
-define_hashtable(ss, char*, char*, __hash_eq_string, __hash_hash_string);
-define_hashtable(li, int64_t, int, __hash_eq_number, __hash_hash_u64);
+_define_hashtable(ii, int, int, __hash_eq_number, __hash_hash_u32);
+_define_hashtable(ll, int64_t, int64_t, __hash_eq_number, __hash_hash_u64);
+_define_hashtable(si, char*, int, __hash_eq_string, __hash_hash_string);
+_define_hashtable(ss, char*, char*, __hash_eq_string, __hash_hash_string);
+_define_hashtable(li, int64_t, int, __hash_eq_number, __hash_hash_u64);
 
-define_hashset(i, int, __hash_eq_number, __hash_hash_u32);
-define_hashset(l, int64_t, __hash_eq_number, __hash_hash_u64);
-define_hashset(s, char*, __hash_eq_string, __hash_hash_string);
+_define_hashset(i, int, __hash_eq_number, __hash_hash_u32);
+_define_hashset(l, int64_t, __hash_eq_number, __hash_hash_u64);
+_define_hashset(s, char*, __hash_eq_string, __hash_hash_string);
 
 #ifdef __cplusplus
 }
 #endif
+
+#define define_hash(name, ktype, vtype, feq, fhash)                           \
+  define_hashtable_entry(name, ktype, vtype);                                 \
+  define_hashset_entry(name, ktype);                                          \
+  _define_lphashtable(name, ktype, vtype, feq, fhash);                         \
+  _define_lphashset(name, ktype, feq, fhash);                                  \
+  _define_hashtable(name, ktype, vtype, feq, fhash);                           \
+  _define_hashset(name, ktype, feq, fhash);
+
+#define define_hashtable(name, ktype, vtype, feq, fhash)                      \
+  define_hashtable_entry(name, ktype, vtype);                                 \
+  _define_lphashtable(name, ktype, vtype, feq, fhash);                        \
+  _define_hashtable(name, ktype, vtype, feq, fhash)
+
+#define define_hashset(name, ktype, feq, fhash)                               \
+  define_hashset_entry(name, ktype);                                          \
+  _define_lphashset(name, ktype, feq, fhash);                                 \
+  _define_hashset(name, ktype, feq, fhash)
+
 #endif

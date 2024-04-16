@@ -224,11 +224,11 @@
     table->iter.offset = 0;                                                   \
   }
 
-#define define_lphashtable(name, ktype, vtype, feq, fhash)                    \
+#define _define_lphashtable(name, ktype, vtype, feq, fhash)                   \
   __define_lphash(table_##name, ktype, vtype);                                \
   __define_lphash_method(table_##name, ktype, feq, fhash)
 
-#define define_lphashset(name, ktype, feq, fhash)                             \
+#define _define_lphashset(name, ktype, feq, fhash)                            \
   __define_lphash(set_##name, ktype, ktype);                                  \
   __define_lphash_method(set_##name, ktype, feq, fhash)
 
@@ -258,18 +258,32 @@
 extern "C" {
 #endif
 
-define_lphashtable(ii, int, int, __hash_eq_number, __hash_hash_u32);
-define_lphashtable(ll, int64_t, int64_t, __hash_eq_number, __hash_hash_u64);
-define_lphashtable(si, char*, int, __hash_eq_string, __hash_hash_string);
-define_lphashtable(ss, char*, char*, __hash_eq_string, __hash_hash_string);
-define_lphashtable(li, int64_t, int, __hash_eq_number, __hash_hash_u64);
+_define_lphashtable(ii, int, int, __hash_eq_number, __hash_hash_u32);
+_define_lphashtable(ll, int64_t, int64_t, __hash_eq_number, __hash_hash_u64);
+_define_lphashtable(si, char*, int, __hash_eq_string, __hash_hash_string);
+_define_lphashtable(ss, char*, char*, __hash_eq_string, __hash_hash_string);
+_define_lphashtable(li, int64_t, int, __hash_eq_number, __hash_hash_u64);
 
-define_lphashset(i, int, __hash_eq_number, __hash_hash_u32);
-define_lphashset(l, int64_t, __hash_eq_number, __hash_hash_u64);
-define_lphashset(s, char*, __hash_eq_string, __hash_hash_string);
+_define_lphashset(i, int, __hash_eq_number, __hash_hash_u32);
+_define_lphashset(l, int64_t, __hash_eq_number, __hash_hash_u64);
+_define_lphashset(s, char*, __hash_eq_string, __hash_hash_string);
 
 #ifdef __cplusplus
 }
 #endif
+
+#define define_lphash(name, ktype, vtype, feq, fhash)                         \
+  define_hashtable_entry(name, ktype, vtype);                                 \
+  define_hashset_entry(name, ktype);                                          \
+  _define_lphashtable(name, ktype, vtype, feq, fhash);                        \
+  _define_lphashset(name, ktype, feq, fhash)
+
+#define define_lphashtable(name, ktype, vtype, feq, fhash)                    \
+  define_hashtable_entry(name, ktype, vtype);                                 \
+  _define_lphashtable(name, ktype, vtype, feq, fhash)
+
+#define define_lphashset(name, ktype, feq, fhash)                             \
+  define_hashset_entry(name, ktype);                                          \
+  _define_lphashset(name, ktype, feq, fhash)
 
 #endif // __lp_hash_h__
