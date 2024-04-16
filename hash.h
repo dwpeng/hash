@@ -1,35 +1,7 @@
 #ifndef __hash_h__
 #define __hash_h__
 
-#include <assert.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#ifndef HASH_MALLOC
-#define hash_malloc(size) malloc(size)
-#define hash_free(ptr) free(ptr)
-#define hash_realloc(ptr, size) realloc(ptr, size)
-#endif
-
-#define LOAD 0.75 // default load factor
-
-#if defined(HASH_MMAP) && defined(__linux__)
-#include <sys/mman.h>
-#ifndef MAP_ANONYMOUS
-#define MAP_ANONYMOUS MAP_ANON
-#endif
-#ifndef MAP_ANON
-#define MAP_ANON 0x20
-#endif
-#define hmalloc(size)                                                         \
-  mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
-#define hfree(ptr, size) munmap(ptr, size)
-#else
-#define hmalloc(size) hash_malloc(size)
-#define hfree(ptr, size) hash_free(ptr)
-#endif
+#include "hash-base.h"
 
 static const uint64_t sys_prime_list[61] = {
   0x7LLU,
@@ -158,58 +130,6 @@ __hash_prime_bigger(uint64_t size)
     } iter;                                                                   \
   };
 
-static inline uint32_t
-__lh3_Jenkins_hash_int(uint32_t key)
-{
-  key += (key << 12);
-  key ^= (key >> 22);
-  key += (key << 4);
-  key ^= (key >> 9);
-  key += (key << 10);
-  key ^= (key >> 2);
-  key += (key << 7);
-  key ^= (key >> 12);
-  return key;
-}
-
-static inline uint64_t
-__lh3_Jenkins_hash_64(uint64_t key)
-{
-  key += ~(key << 32);
-  key ^= (key >> 22);
-  key += ~(key << 13);
-  key ^= (key >> 8);
-  key += (key << 3);
-  key ^= (key >> 15);
-  key += ~(key << 27);
-  key ^= (key >> 31);
-  return key;
-}
-
-static inline uint64_t
-__roundup64__(uint64_t x)
-{
-  x--;
-  x |= x >> 1;
-  x |= x >> 2;
-  x |= x >> 4;
-  x |= x >> 8;
-  x |= x >> 16;
-  x |= x >> 32;
-  x++;
-  return x;
-}
-
-static inline uint32_t
-__string_hashcode(const char* s)
-{
-  uint32_t h = *s;
-  if (h)
-    for (++s; *s; ++s)
-      h = (h << 5) - h + *s;
-  return h;
-}
-
 #define __is_set(flags, index) (((flags)[(index) / 64] >> ((index) % 64)) & 1)
 #define __set(flags, index) ((flags)[(index) / 64] |= (1LLU << ((index) % 64)))
 
@@ -243,20 +163,20 @@ __string_hashcode(const char* s)
       table->array[i].mask = size_list[i] - 1;                                \
       table->array[i].prime = size_list[i];                                   \
       table->array[i].size = 0;                                               \
-      table->array[i].flags =                                                 \
-          (uint64_t*)hmalloc(sizeof(uint64_t) * (size_list[i] + 63) / 64);    \
+      table->array[i].flags = (uint64_t*)hash_malloc(                         \
+          sizeof(uint64_t) * (size_list[i] + 63) / 64);                       \
       memset(table->array[i].flags, 0,                                        \
              sizeof(uint64_t) * (size_list[i] + 63) / 64);                    \
-      table->array[i].entries = (hash##name##_entry_t*)hmalloc(               \
+      table->array[i].entries = (hash##name##_entry_t*)hash_malloc(           \
           sizeof(hash##name##_entry_t) * size_list[i]);                       \
     }                                                                         \
     table->scale_array = (_hash##name##_scale_array_t*)hash_malloc(           \
         sizeof(_hash##name##_scale_array_t));                                 \
-    table->scale_array->entries =                                             \
-        (hash##name##_entry_t**)hmalloc(sizeof(hash##name##_entry_t*) * 128); \
+    table->scale_array->entries = (hash##name##_entry_t**)hash_malloc(        \
+        sizeof(hash##name##_entry_t*) * 128);                                 \
     table->scale_array->capacity = 128;                                       \
     table->scale_array->flags =                                               \
-        (uint64_t*)hmalloc(sizeof(uint64_t) * (128 + 63) / 64);               \
+        (uint64_t*)hash_malloc(sizeof(uint64_t) * (128 + 63) / 64);           \
     memset(table->scale_array->flags, 0, sizeof(uint64_t) * (128 + 63) / 64); \
     table->scale_array->size = 0;                                             \
     table->iter.offset = 0;                                                   \
@@ -268,15 +188,13 @@ __string_hashcode(const char* s)
   }                                                                           \
   static inline hash##name##_t* hash##name##_init(size_t max_size, int m)     \
   {                                                                           \
-    return hash##name##_init_with_load(max_size, m, LOAD);                    \
+    return hash##name##_init_with_load(max_size, m, HASH_LOAD_FACTOR);        \
   }                                                                           \
   static inline void hash##name##_free(hash##name##_t* table)                 \
   {                                                                           \
     for (int i = 0; i < table->m; i++) {                                      \
-      hfree(table->array[i].entries,                                          \
-            sizeof(hash##name##_entry_t) * table->array[i].prime);            \
-      hfree(table->array[i].flags,                                            \
-            sizeof(uint64_t) * ((table->array[i].prime + 63) / 64));          \
+      hash_free(table->array[i].entries);                                     \
+      hash_free(table->array[i].flags);                                       \
     }                                                                         \
     hash_free(table->array);                                                  \
     for (uint64_t i = 0; i < table->scale_array->capacity; i++) {             \
@@ -284,10 +202,8 @@ __string_hashcode(const char* s)
         hash_free(table->scale_array->entries[i]);                            \
       }                                                                       \
     }                                                                         \
-    hfree(table->scale_array->entries,                                        \
-          (sizeof(hash##name##_entry_t) * table->scale_array->capacity));     \
-    hfree(table->scale_array->flags,                                          \
-          ((sizeof(uint64_t) * ((table->scale_array->capacity) + 63) / 64))); \
+    hash_free(table->scale_array->entries);                                   \
+    hash_free(table->scale_array->flags);                                     \
     hash_free(table->scale_array);                                            \
     hash_free(table);                                                         \
   }                                                                           \
@@ -309,7 +225,7 @@ __string_hashcode(const char* s)
           return NULL;                                                        \
         }                                                                     \
         entries = array[i].entries;                                           \
-        if (feq(entries[index].key, key)) {                                       \
+        if (feq(entries[index].key, key)) {                                   \
           *found = 1;                                                         \
           return &entries[index];                                             \
         }                                                                     \
@@ -331,7 +247,7 @@ __string_hashcode(const char* s)
         i = 0;                                                                \
       }                                                                       \
       if (__is_set(table->scale_array->flags, i)) {                           \
-        if (feq(entries[i]->key, key)) {                                        \
+        if (feq(entries[i]->key, key)) {                                      \
           *found = 1;                                                         \
           return entries[i];                                                  \
         }                                                                     \
@@ -379,14 +295,14 @@ __string_hashcode(const char* s)
     if ((double)scale_array->size / (double)scale_array->capacity             \
         > table->load) {                                                      \
       uint64_t old_cap = scale_array->capacity;                               \
-      uint64_t new_cap = __roundup64__(scale_array->capacity + 1);            \
+      uint64_t new_cap = __hash_roundup64_dwp__(scale_array->capacity + 1);   \
       assert(new_cap > old_cap);                                              \
       uint64_t* flags = scale_array->flags;                                   \
       hash##name##_entry_t** entries = scale_array->entries;                  \
       scale_array->flags =                                                    \
-          (uint64_t*)hmalloc(sizeof(uint64_t) * (new_cap + 63) / 64);         \
+          (uint64_t*)hash_malloc(sizeof(uint64_t) * (new_cap + 63) / 64);     \
       memset(scale_array->flags, 0, sizeof(uint64_t) * (new_cap + 63) / 64);  \
-      scale_array->entries = (hash##name##_entry_t**)hmalloc(                 \
+      scale_array->entries = (hash##name##_entry_t**)hash_malloc(             \
           sizeof(hash##name##_entry_t*) * new_cap);                           \
       memset(scale_array->entries, 0,                                         \
              sizeof(hash##name##_entry_t*) * new_cap);                        \
@@ -417,8 +333,8 @@ __string_hashcode(const char* s)
           scale_array->entries[index] = entries[i];                           \
         }                                                                     \
       }                                                                       \
-      hfree(flags, sizeof(uint64_t) * (old_cap + 63) / 64);                   \
-      hfree(entries, sizeof(hash##name##_entry_t) * old_cap);                 \
+      hash_free(flags);                                                       \
+      hash_free(entries);                                                     \
       scale_array->capacity = new_cap;                                        \
     }                                                                         \
     uint64_t index = h % (scale_array->capacity - 1);                         \
@@ -430,7 +346,7 @@ __string_hashcode(const char* s)
           i = 0;                                                              \
         }                                                                     \
         if (__is_set(scale_array->flags, i)) {                                \
-          if (feq(entries[i]->key, key)) {                                      \
+          if (feq(entries[i]->key, key)) {                                    \
             if (replace) {                                                    \
               hash##name##_entry_t* e = (hash##name##_entry_t*)hash_malloc(   \
                   sizeof(hash##name##_entry_t));                              \
@@ -549,29 +465,15 @@ __string_hashcode(const char* s)
 extern "C" {
 #endif
 
-#define ii_eq(key1, key2) ((key1) == (key2))
-#define ii_hash(key) __lh3_Jenkins_hash_int(key)
-define_hashtable(ii, int, int, ii_eq, ii_hash);
+define_hashtable(ii, int, int, __hash_eq_number, __hash_hash_u32);
+define_hashtable(ll, int64_t, int64_t, __hash_eq_number, __hash_hash_u64);
+define_hashtable(si, char*, int, __hash_eq_string, __hash_hash_string);
+define_hashtable(ss, char*, char*, __hash_eq_string, __hash_hash_string);
+define_hashtable(li, int64_t, int, __hash_eq_number, __hash_hash_u64);
 
-#define ll_eq(key1, key2) ((key1) == (key2))
-#define ll_hash(key) __lh3_Jenkins_hash_64(key)
-define_hashtable(ll, int64_t, int64_t, ll_eq, ll_hash);
-
-#define si_eq(key1, key2) (strcmp((key1), (key2)) == 0)
-#define si_hash(key) __string_hashcode(key)
-define_hashtable(si, char*, int, si_eq, si_hash);
-
-#define ss_eq(key1, key2) (strcmp((key1), (key2)) == 0)
-#define ss_hash(key) __string_hashcode(key)
-define_hashtable(ss, char*, char*, ss_eq, ss_hash);
-
-#define li_eq(key1, key2) (key1 == key2)
-#define li_hash(key) __lh3_Jenkins_hash_64(key)
-define_hashtable(li, int64_t, int, li_eq, li_hash);
-
-define_hashset(i, int, ii_eq, ii_hash);
-define_hashset(l, int64_t, ll_eq, ll_hash);
-define_hashset(s, char*, si_eq, si_hash);
+define_hashset(i, int, __hash_eq_number, __hash_hash_u32);
+define_hashset(l, int64_t, __hash_eq_number, __hash_hash_u64);
+define_hashset(s, char*, __hash_eq_string, __hash_hash_string);
 
 #ifdef __cplusplus
 }
