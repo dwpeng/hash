@@ -225,12 +225,10 @@
   }
 
 #define define_lphashtable(name, ktype, vtype, feq, fhash)                    \
-  __define_hash_table_entry(table_##name, ktype, vtype);                      \
   __define_lphash(table_##name, ktype, vtype);                                \
   __define_lphash_method(table_##name, ktype, feq, fhash)
 
 #define define_lphashset(name, ktype, feq, fhash)                             \
-  __define_hash_set_entry(set_##name, ktype);                                 \
   __define_lphash(set_##name, ktype, ktype);                                  \
   __define_lphash_method(set_##name, ktype, feq, fhash)
 

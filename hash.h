@@ -2,6 +2,7 @@
 #define __hash_h__
 
 #include "hash-base.h"
+#include "lp-hash.h"
 
 static const uint64_t sys_prime_list[61] = {
   0x7LLU,
@@ -420,7 +421,6 @@ __hash_prime_bigger(uint64_t size)
   }
 
 #define define_hashtable(name, ktype, vtype, feq, fhash)                      \
-  __define_hash_table_entry(table_##name, ktype, vtype);                      \
   __define_hash(table_##name, ktype, vtype, feq, fhash);                      \
   __define_hash_method(table_##name, feq, fhash, ktype, vtype);
 
@@ -434,7 +434,6 @@ __hash_prime_bigger(uint64_t size)
 // clang-format on
 
 #define define_hashset(name, ketype, feq, fhash)                              \
-  __define_hash_set_entry(set_##name, ketype);                                \
   __define_hash(set_##name, ketype, NULL, feq, fhash);                        \
   __define_hash_method(set_##name, feq, fhash, ketype, NULL);
 

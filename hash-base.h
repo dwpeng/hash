@@ -80,15 +80,25 @@ __string_hashcode(const char* s)
 #define __hash_hash_u64(key) __lh3_Jenkins_hash_64(key)
 #define __hash_hash_string(key) __string_hashcode(key)
 
-#define __define_hash_table_entry(name, ktype, vtype)                         \
+#define define_hashtable_entry(name, ktype, vtype)                         \
   typedef struct {                                                            \
     ktype key;                                                                \
     vtype value;                                                              \
-  } hash##name##_entry_t;
+  } hashtable_##name##_entry_t;
 
-#define __define_hash_set_entry(name, ktype)                                  \
+#define define_hashset_entry(name, ktype)                                  \
   typedef struct {                                                            \
     ktype key;                                                                \
-  } hash##name##_entry_t;
+  } hashset_##name##_entry_t;
+
+define_hashset_entry(i, int);
+define_hashset_entry(l, int64_t);
+define_hashset_entry(s, char*);
+
+define_hashtable_entry(ii, int, int);
+define_hashtable_entry(ll, int64_t, int64_t);
+define_hashtable_entry(si, char*, int);
+define_hashtable_entry(ss, char*, char*);
+define_hashtable_entry(li, int64_t, int);
 
 #endif // __hash_base_h__
