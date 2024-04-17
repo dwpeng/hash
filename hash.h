@@ -281,11 +281,11 @@ __hash_prime_bigger(uint64_t size)
   __define_hash_method(table_##name, feq, fhash, ktype, vtype);
 
 // clang-format off
-#define hashtable_with_capacity(name, max_size, m, load) hashtable_##name##_with_capacity(max_size, m, load)
-#define hashtable_free(name, table)              hashtable_##name##_free(table)
-#define hashtable_get(name, table, key, found)   hashtable_##name##_get(table, key, found)
-#define hashtable_put(name, table, entry)        hashtable_##name##_put(table, entry)
-#define hashtable_iter(name, table)              hashtable_##name##_iter(table)
+#define hashtable_with_capacity(name, max_size, m, load)  hashtable_##name##_with_capacity(max_size, m, load)
+#define hashtable_free(name, table)                       hashtable_##name##_free(table)
+#define hashtable_get(name, table, key, found)            hashtable_##name##_get(table, key, found)
+#define hashtable_put(name, table, entry, replace, exist) hashtable_##name##_put(table, entry, replace, exist)
+#define hashtable_iter(name, table)                       hashtable_##name##_iter(table)
 // clang-format on
 
 #define _define_hashset(name, ketype, feq, fhash)                             \
@@ -293,11 +293,11 @@ __hash_prime_bigger(uint64_t size)
   __define_hash_method(set_##name, feq, fhash, ketype, NULL);
 
 // clang-format off
-#define hashset_with_capacity(name, max_size, m, load) hashset_##name##_with_capacity(max_size, m, load)
-#define hashset_free(name, table)                hashset_##name##_free(table)
-#define hashset_get(name, table, key, found)     hashset_##name##_get(table, key, found)
-#define hashset_put(name, table, entry)          hashset_##name##_put(table, entry)
-#define hashset_iter(name, table)                hashset_##name##_iter(table)
+#define hashset_with_capacity(name, max_size, m, load)           hashset_##name##_with_capacity(max_size, m, load)
+#define hashset_free(name, table)                                hashset_##name##_free(table)
+#define hashset_get(name, table, key, found)                     hashset_##name##_get(table, key, found)
+#define hashset_put(name, table, entry, replace, exist)          hashset_##name##_put(table, entry, replace, exist)
+#define hashset_iter(name, table)                                hashset_##name##_iter(table)
 // clang-format on
 
 #ifdef __cplusplus
@@ -321,9 +321,9 @@ _define_hashset(s, char*, __hash_eq_string, __hash_hash_string);
 #define define_hash(name, ktype, vtype, feq, fhash)                           \
   define_hashtable_entry(name, ktype, vtype);                                 \
   define_hashset_entry(name, ktype);                                          \
-  _define_lphashtable(name, ktype, vtype, feq, fhash);                         \
-  _define_lphashset(name, ktype, feq, fhash);                                  \
-  _define_hashtable(name, ktype, vtype, feq, fhash);                           \
+  _define_lphashtable(name, ktype, vtype, feq, fhash);                        \
+  _define_lphashset(name, ktype, feq, fhash);                                 \
+  _define_hashtable(name, ktype, vtype, feq, fhash);                          \
   _define_hashset(name, ktype, feq, fhash);
 
 #define define_hashtable(name, ktype, vtype, feq, fhash)                      \
