@@ -274,6 +274,26 @@ __hash_prime_bigger(uint64_t size)
       table->iter.status = 1;                                                 \
     }                                                                         \
     return entry;                                                             \
+  }                                                                           \
+  static inline void hash##name##_reset_iter(hash##name##_t* table)           \
+  {                                                                           \
+    table->iter.offset = 0;                                                   \
+    table->iter.size = 0;                                                     \
+    table->iter.status = 0;                                                   \
+    table->iter.m = 0;                                                        \
+    table->iter.type = 0;                                                     \
+    lphash##name##_reset_iter(table->linear);                                 \
+  }                                                                           \
+  static inline void hash##name##_clear(hash##name##_t* table)                \
+  {                                                                           \
+    for (int i = 0; i < table->m; i++) {                                      \
+      memset(table->array[i].flags, 0,                                        \
+             sizeof(uint64_t) * (table->array[i].prime + 63) / 64);           \
+      table->array[i].size = 0;                                               \
+    }                                                                         \
+    lphash##name##_clear(table->linear);                                      \
+    hash##name##_reset_iter(table);                                           \
+    table->size = 0;                                                          \
   }
 
 #define _define_hashtable(name, ktype, vtype, feq, fhash)                     \
@@ -286,6 +306,8 @@ __hash_prime_bigger(uint64_t size)
 #define hashtable_get(name, table, key, found)            hashtable_##name##_get(table, key, found)
 #define hashtable_put(name, table, entry, replace, exist) hashtable_##name##_put(table, entry, replace, exist)
 #define hashtable_iter(name, table)                       hashtable_##name##_iter(table)
+#define hashtable_clear(name, table)                      hashtable_##name##_clear(table)
+#define hashtable_reset_iter(name, table)                 hashtable_##name##_reset_iter(table)
 // clang-format on
 
 #define _define_hashset(name, ketype, feq, fhash)                             \
@@ -298,6 +320,8 @@ __hash_prime_bigger(uint64_t size)
 #define hashset_get(name, table, key, found)                     hashset_##name##_get(table, key, found)
 #define hashset_put(name, table, entry, replace, exist)          hashset_##name##_put(table, entry, replace, exist)
 #define hashset_iter(name, table)                                hashset_##name##_iter(table)
+#define hashset_clear(name, table)                               hashset_##name##_clear(table)
+#define hashset_reset_iter(name, table)                          hashset_##name##_reset_iter(table)
 // clang-format on
 
 #ifdef __cplusplus
