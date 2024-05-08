@@ -197,11 +197,10 @@ __hash_prime_bigger(uint64_t size)
     }                                                                         \
     return lphash##name##_get(table->linear, key, found);                     \
   }                                                                           \
-  static inline hash##name##_entry_t* hash##name##_put(                       \
-      hash##name##_t* table, hash##name##_entry_t* entry, int replace,        \
-      int* exist)                                                             \
+  static inline hash##name##_entry_t* hash##name##_hput(                      \
+      hash##name##_t* table, hash##name##_entry_t* entry, uint64_t h,         \
+      int replace, int* exist)                                                \
   {                                                                           \
-    uint64_t h = fhash(entry->key);                                           \
     _hash##name##_array_t* array_list = table->array;                         \
     hash##name##_entry_t* entries;                                            \
     ktype key = entry->key;                                                   \
@@ -230,6 +229,13 @@ __hash_prime_bigger(uint64_t size)
       table->size++;                                                          \
     }                                                                         \
     return entries;                                                           \
+  }                                                                           \
+  static inline hash##name##_entry_t* hash##name##_put(                       \
+      hash##name##_t* table, hash##name##_entry_t* entry, int replace,        \
+      int* exist)                                                             \
+  {                                                                           \
+    return hash##name##_hput(table, entry, fhash(entry->key), replace,        \
+                             exist);                                          \
   }                                                                           \
   static inline hash##name##_entry_t* hash##name##_iter(                      \
       hash##name##_t* table)                                                  \
@@ -305,6 +311,7 @@ __hash_prime_bigger(uint64_t size)
 #define hashtable_free(name, table)                       hashtable_##name##_free(table)
 #define hashtable_get(name, table, key, found)            hashtable_##name##_get(table, key, found)
 #define hashtable_put(name, table, entry, replace, exist) hashtable_##name##_put(table, entry, replace, exist)
+#define hashtable_hput(name, table, entry, h, replace, exist) hashtable_##name##_hput(table, entry, h, replace, exist)
 #define hashtable_iter(name, table)                       hashtable_##name##_iter(table)
 #define hashtable_clear(name, table)                      hashtable_##name##_clear(table)
 #define hashtable_reset_iter(name, table)                 hashtable_##name##_reset_iter(table)
@@ -319,6 +326,7 @@ __hash_prime_bigger(uint64_t size)
 #define hashset_free(name, table)                                hashset_##name##_free(table)
 #define hashset_get(name, table, key, found)                     hashset_##name##_get(table, key, found)
 #define hashset_put(name, table, entry, replace, exist)          hashset_##name##_put(table, entry, replace, exist)
+#define hashset_hput(name, table, entry, h, replace, exist)      hashset_##name##_hput(table, entry, h, replace, exist)
 #define hashset_iter(name, table)                                hashset_##name##_iter(table)
 #define hashset_clear(name, table)                               hashset_##name##_clear(table)
 #define hashset_reset_iter(name, table)                          hashset_##name##_reset_iter(table)

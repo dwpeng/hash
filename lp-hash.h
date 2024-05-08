@@ -144,17 +144,16 @@
     table->raw.capacity = capacity;                                           \
     table->raw.mask = capacity - 1;                                           \
   }                                                                           \
-  static inline hash##name##_entry_t* lphash##name##_put(                     \
-      lphash##name##_t* table, hash##name##_entry_t* entry, int replace,      \
-      int* exist)                                                             \
+  static inline hash##name##_entry_t* lphash##name##_hput(                    \
+      lphash##name##_t* table, hash##name##_entry_t* entry, uint64_t h,       \
+      int replace, int* exist)                                                \
   {                                                                           \
     if (1.0 * table->size / table->raw.capacity > table->load_factor) {       \
       lphash##name##_resize(table);                                           \
     }                                                                         \
     *exist = 0;                                                               \
-    uint64_t h;                                                               \
     uint64_t mask = table->raw.mask;                                          \
-    h = fhash(entry->key) % mask;                                             \
+    h = h % mask;                                                             \
     while (__is_set(table->flags, h)) {                                       \
       if (feq(table->raw.entries[table->entries[h] / table->raw.block_size]   \
                   ->entries[table->entries[h] % table->raw.block_size]        \
@@ -184,7 +183,13 @@
     return &table->raw.entries[table->entries[h] / table->raw.block_size]     \
                 ->entries[table->entries[h] % table->raw.block_size];         \
   }                                                                           \
-                                                                              \
+  static inline hash##name##_entry_t* lphash##name##_put(                     \
+      lphash##name##_t* table, hash##name##_entry_t* entry, int replace,      \
+      int* exist)                                                             \
+  {                                                                           \
+    return lphash##name##_hput(table, entry, fhash(entry->key), replace,      \
+                               exist);                                        \
+  }                                                                           \
   static inline hash##name##_entry_t* lphash##name##_get(                     \
       lphash##name##_t* table, ktype key, int* exist)                         \
   {                                                                           \
@@ -237,6 +242,7 @@
 #define lphashtable_free(name, table)                                 lphashtable_##name##_free(table)
 #define lphashtable_get(name, table, key, found)                      lphashtable_##name##_get(table, key, found)
 #define lphashtable_put(name, table, entry, replaced, exist)          lphashtable_##name##_put(table, entry, replaced, exist)
+#define lphashtable_hput(name, table, entry, h, replaced, exist)      lphashtable_##name##_hput(table, entry, h, replaced, exist)
 #define lphashtable_clear(name, table)                                lphashtable_##name##_clear(table)
 #define lphashtable_resize(name, table)                               lphashtable_##name##_resize(table)
 #define lphashtable_iter(name, table)                                 lphashtable_##name##_iter(table)
@@ -248,6 +254,7 @@
 #define lphashset_free(name, table)                                   lphashset_##name##_free(table)
 #define lphashset_get(name, table, key, found)                        lphashset_##name##_get(table, key, found)
 #define lphashset_put(name, table, entry, replaced, exist)            lphashset_##name##_put(table, entry, replaced, exist)
+#define lphashset_hput(name, table, entry, h, replaced, exist)        lphashset_##name##_hput(table, entry, h, replaced, exist)
 #define lphashset_clear(name, table)                                  lphashset_##name##_clear(table)
 #define lphashset_resize(name, table)                                 lphashset_##name##_resize(table)
 #define lphashset_iter(name, table)                                   lphashset_##name##_iter(table)
