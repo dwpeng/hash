@@ -224,7 +224,7 @@ __hash_prime_bigger(uint64_t size)
       __set(array_list[i].flags, index);                                      \
       return &entries[index];                                                 \
     }                                                                         \
-    entries = lphash##name##_put(table->linear, entry, replace, exist);       \
+    entries = lphash##name##_hput(table->linear, entry, h, replace, exist);   \
     if (!*exist) {                                                            \
       table->size++;                                                          \
     }                                                                         \
