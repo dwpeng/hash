@@ -79,6 +79,5 @@ replace hashtable_ii with hashset_ii in the above example
 ```bash
 git clone git@github.com:dwpeng/hash.git
 cd hash
-make
-./test
+python complie.py
 ```
