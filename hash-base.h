@@ -15,6 +15,60 @@
 
 #define HASH_LOAD_FACTOR 0.75
 
+/*
+ *
+ * The following code is from the fastmod library, which is licensed under the
+ * Apache License 2.0.
+ **/
+
+// This is for the 64-bit functions.
+static inline uint64_t
+__dwp_mul128_u64(__uint128_t lowbits, uint64_t d)
+{
+  __uint128_t bottom_half =
+      (lowbits & UINT64_C(0xFFFFFFFFFFFFFFFF)) * d; // Won't overflow
+  bottom_half >>=
+      64; // Only need the top 64 bits, as we'll shift the lower half away;
+  __uint128_t top_half = (lowbits >> 64) * d;
+  __uint128_t both_halves =
+      bottom_half + top_half; // Both halves are already shifted down by 64
+  both_halves >>= 64;         // Get top half of both_halves
+  return (uint64_t)both_halves;
+}
+
+// What follows is the 64-bit functions.
+// They are currently not supported on Visual Studio
+// due to the lack of a __dwp_mul128_u64 function.
+// They may not be faster than what the compiler
+// can produce.
+
+static inline __uint128_t
+__dwp_computeM_u64(uint64_t d)
+{
+  // what follows is just ((__uint128_t)0 - 1) / d) + 1 spelled out
+  __uint128_t M = UINT64_C(0xFFFFFFFFFFFFFFFF);
+  M <<= 64;
+  M |= UINT64_C(0xFFFFFFFFFFFFFFFF);
+  M /= d;
+  M += 1;
+  return M;
+}
+
+static inline uint64_t
+__dwp_fastmod_u64(uint64_t a, __uint128_t M, uint64_t d)
+{
+  __uint128_t lowbits = M * a;
+  return __dwp_mul128_u64(lowbits, d);
+}
+
+static inline uint64_t
+__dwp_fastdiv_u64(uint64_t a, __uint128_t M)
+{
+  return __dwp_mul128_u64(M, a);
+}
+
+// End of the 64-bit functions
+
 static inline uint32_t
 __lh3_Jenkins_hash_int(uint32_t key)
 {
@@ -80,13 +134,13 @@ __string_hashcode(const char* s)
 #define __hash_hash_u64(key) __lh3_Jenkins_hash_64(key)
 #define __hash_hash_string(key) __string_hashcode(key)
 
-#define define_hashtable_entry(name, ktype, vtype)                         \
+#define define_hashtable_entry(name, ktype, vtype)                            \
   typedef struct {                                                            \
     ktype key;                                                                \
     vtype value;                                                              \
   } hashtable_##name##_entry_t;
 
-#define define_hashset_entry(name, ktype)                                  \
+#define define_hashset_entry(name, ktype)                                     \
   typedef struct {                                                            \
     ktype key;                                                                \
   } hashset_##name##_entry_t;

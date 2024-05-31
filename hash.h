@@ -93,6 +93,7 @@ __hash_prime_bigger(uint64_t size)
 #define __define_hash(name, ktype, vtype, feq, fhash)                         \
   typedef struct {                                                            \
     uint64_t mask;                                                            \
+    __uint128_t M;                                                            \
     uint64_t prime;                                                           \
     uint64_t size;                                                            \
     uint64_t* flags;                                                          \
@@ -141,6 +142,7 @@ __hash_prime_bigger(uint64_t size)
         sizeof(_hash##name##_array_t) * m);                                   \
     for (int i = 0; i < m; i++) {                                             \
       table->array[i].mask = size_list[i] - 1;                                \
+      table->array[i].M = __dwp_computeM_u64(size_list[i] - 1);               \
       table->array[i].prime = size_list[i];                                   \
       table->array[i].size = 0;                                               \
       table->array[i].flags = (uint64_t*)hash_malloc(                         \
@@ -176,11 +178,12 @@ __hash_prime_bigger(uint64_t size)
     {                                                                         \
       hash##name##_entry_t* entries;                                          \
       *found = 0;                                                             \
+      uint64_t index;                                                         \
       for (int i = 0; i < table->m; i++) {                                    \
         if (!array[i].size) {                                                 \
           continue;                                                           \
         }                                                                     \
-        uint64_t index = h % array[i].mask;                                   \
+        index = __dwp_fastmod_u64(h, array[i].M, array[i].mask);              \
         if (!__is_set(array[i].flags, index)) {                               \
           *found = 0;                                                         \
           return NULL;                                                        \
@@ -205,9 +208,10 @@ __hash_prime_bigger(uint64_t size)
     hash##name##_entry_t* entries;                                            \
     ktype key = entry->key;                                                   \
     *exist = 0;                                                               \
+    uint64_t index;                                                           \
     for (int i = 0; i < table->m; i++) {                                      \
       entries = array_list[i].entries;                                        \
-      uint64_t index = h % array_list[i].mask;                                \
+      index = __dwp_fastmod_u64(h, array_list[i].M, array_list[i].mask);      \
       if (__is_set(array_list[i].flags, index)) {                             \
         if (feq(entries[index].key, key)) {                                   \
           if (replace) {                                                      \

@@ -21,7 +21,9 @@
       int nblocks;                                                            \
       uint64_t capacity;                                                      \
       uint64_t mask;                                                          \
+      __uint128_t M;                                                          \
       uint64_t block_size;                                                    \
+      __uint128_t blockM;                                                     \
     } raw;                                                                    \
     struct {                                                                  \
       int block_index;                                                        \
@@ -55,10 +57,13 @@
     table->size = 0;                                                          \
     table->load_factor = load_factor;                                         \
     table->raw.block_size = block_size;                                       \
+    assert(block_size > 1);                                                   \
+    table->raw.blockM = __dwp_computeM_u64(block_size);                       \
     capacity = 1.0 * capacity / load_factor;                                  \
     capacity = __hash_roundup64_dwp__(capacity);                              \
     table->raw.capacity = capacity;                                           \
-    table->raw.mask = table->raw.capacity - 1;                                \
+    table->raw.mask = table->raw.capacity - 1ULL;                             \
+    table->raw.M = __dwp_computeM_u64(capacity - 1ULL);                       \
     table->raw.block_index = 0;                                               \
     int nblocks = capacity / block_size + 1;                                  \
     table->raw.nblocks = nblocks;                                             \
@@ -121,12 +126,14 @@
         (uint32_t*)hash_realloc(table->entries, sizeof(uint32_t) * capacity); \
     uint64_t h;                                                               \
     uint64_t mask = capacity - 1;                                             \
+    __uint128_t M = __dwp_computeM_u64(mask);                                 \
     for (int i = 0; i < table->raw.nblocks; i++) {                            \
       __lphash##name##_raw_entries_t* block = table->raw.entries[i];          \
       for (uint64_t j = 0; j < block->offset; j++) {                          \
-        h = fhash(block->entries[j].key) % mask;                              \
+        h = fhash(block->entries[j].key);                                     \
+        h = __dwp_fastmod_u64(h, M, mask);                                    \
         while (__is_set(table->flags, h)) {                                   \
-          h = (h + 1) & mask;                                                 \
+          h = __dwp_fastmod_u64(h + 1, M, mask);                              \
         }                                                                     \
         __set(table->flags, h);                                               \
         table->entries[h] = i * block_size + j;                               \
@@ -143,6 +150,7 @@
     table->raw.nblocks = nblocks;                                             \
     table->raw.capacity = capacity;                                           \
     table->raw.mask = capacity - 1;                                           \
+    table->raw.M = M;                                                         \
   }                                                                           \
   static inline hash##name##_entry_t* lphash##name##_hput(                    \
       lphash##name##_t* table, hash##name##_entry_t* entry, uint64_t h,       \
@@ -153,21 +161,22 @@
     }                                                                         \
     *exist = 0;                                                               \
     uint64_t mask = table->raw.mask;                                          \
-    h = h % mask;                                                             \
+    h = __dwp_fastmod_u64(h, table->raw.M, mask);                             \
+    uint64_t block_index;                                                     \
+    uint64_t block_offset;                                                    \
     while (__is_set(table->flags, h)) {                                       \
-      if (feq(table->raw.entries[table->entries[h] / table->raw.block_size]   \
-                  ->entries[table->entries[h] % table->raw.block_size]        \
-                  .key,                                                       \
+      block_index = __dwp_fastdiv_u64(table->entries[h], table->raw.blockM);  \
+      block_offset = __dwp_fastmod_u64(table->entries[h], table->raw.blockM,  \
+                                       table->raw.block_size);                \
+      if (feq(table->raw.entries[block_index]->entries[block_offset].key,     \
               entry->key)) {                                                  \
         *exist = 1;                                                           \
         if (replace) {                                                        \
-          table->raw.entries[table->entries[h] / table->raw.block_size]       \
-              ->entries[table->entries[h] % table->raw.block_size] = *entry;  \
+          table->raw.entries[block_index]->entries[block_offset] = *entry;    \
         }                                                                     \
-        return &table->raw.entries[table->entries[h] / table->raw.block_size] \
-                    ->entries[table->entries[h] % table->raw.block_size];     \
+        return &table->raw.entries[block_index]->entries[block_offset];       \
       }                                                                       \
-      h = (h + 1) & mask;                                                     \
+      h = __dwp_fastmod_u64(h + 1, table->raw.M, mask);                       \
     }                                                                         \
     __set(table->flags, h);                                                   \
     __lphash##name##_raw_entries_t* block =                                   \
@@ -180,8 +189,10 @@
     if (block->offset == block->capacity) {                                   \
       table->raw.block_index++;                                               \
     }                                                                         \
-    return &table->raw.entries[table->entries[h] / table->raw.block_size]     \
-                ->entries[table->entries[h] % table->raw.block_size];         \
+    block_index = __dwp_fastdiv_u64(table->entries[h], table->raw.blockM);    \
+    block_offset = __dwp_fastmod_u64(table->entries[h], table->raw.blockM,    \
+                                     table->raw.block_size);                  \
+    return &table->raw.entries[block_index]->entries[block_offset];           \
   }                                                                           \
   static inline hash##name##_entry_t* lphash##name##_put(                     \
       lphash##name##_t* table, hash##name##_entry_t* entry, int replace,      \
@@ -194,17 +205,24 @@
       lphash##name##_t* table, ktype key, int* exist)                         \
   {                                                                           \
     *exist = 0;                                                               \
-    uint64_t h = fhash(key) % table->raw.mask;                                \
+    uint64_t h = fhash(key);                                                  \
+    uint64_t mask = table->raw.mask;                                          \
+    uint64_t rawh = h;                                                        \
+    h = __dwp_fastmod_u64(h, table->raw.M, mask);                             \
+    assert(h == rawh % mask);                                                 \
+    uint64_t block_index;                                                     \
+    uint64_t block_offset;                                                    \
     while (__is_set(table->flags, h)) {                                       \
-      if (feq(table->raw.entries[table->entries[h] / table->raw.block_size]   \
-                  ->entries[table->entries[h] % table->raw.block_size]        \
-                  .key,                                                       \
+      block_index = __dwp_fastdiv_u64(table->entries[h], table->raw.blockM);  \
+      block_offset = __dwp_fastmod_u64(table->entries[h], table->raw.blockM,  \
+                                       table->raw.block_size);                \
+      assert(table->entries[h] % table->raw.block_size == block_offset);      \
+      if (feq(table->raw.entries[block_index]->entries[block_offset].key,     \
               key)) {                                                         \
         *exist = 1;                                                           \
-        return &table->raw.entries[table->entries[h] / table->raw.block_size] \
-                    ->entries[table->entries[h] % table->raw.block_size];     \
+        return &table->raw.entries[block_index]->entries[block_offset];       \
       }                                                                       \
-      h = (h + 1) & table->raw.mask;                                          \
+      h = __dwp_fastmod_u64(h + 1, table->raw.M, mask);                       \
     }                                                                         \
     return NULL;                                                              \
   }                                                                           \
