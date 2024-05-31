@@ -33,8 +33,7 @@ main()
     assert(e->key == i);
   }
   hashtable_free(test, table);
-
-  lphashtable_test_t* ltable = lphashtable_with_capacity(test, 100, 1, 0.8);
+  lphashtable_test_t* ltable = lphashtable_with_capacity(test, 100, 1024, 0.8);
   for (int i = 0; i < N; i++) {
     entry.key = i;
     entry.value = i;
