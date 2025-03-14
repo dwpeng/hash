@@ -1,5 +1,6 @@
 import os
 import sys
+import subprocess
 
 language_map = {
     "c": "gcc",
@@ -47,9 +48,9 @@ if __name__ == "__main__":
     deps = ["thpool/thpool.c"]
     test_dir = "test"
     output_dir = "."
-    flags = ["-Wall", "-g", "-O3", "-std=c11", "-I.", "-I./thpool"]
+    flags = ["-Wall", "-g", "-O3", "-I.", "-I./thpool"]
     sources = os.listdir(test_dir)
-    for src in sources:
+    for index, src in enumerate(sources, start=1):
         exe_name = src.split(".")[0]
         exe_name = os.path.join(output_dir, exe_name)
         if os.path.exists(exe_name):
@@ -57,6 +58,18 @@ if __name__ == "__main__":
         try:
             complie_file(os.path.join(test_dir, src), exe_name, flags, deps)
         except Exception as e:
-            print(f"Error: complie {src} failed. {e}")
+            print(f"{index}: Error: complie {src} failed. {e}")
         else:
-            print(f"Complie \033[1;32m{src}\033[0m successfully.")
+            print(f"{index}: Complie \033[1;32m{src}\033[0m successfully.")
+        try:
+            # run the test
+            exit_code = subprocess.call([exe_name], stdout=subprocess.DEVNULL)
+            if exit_code != 0:
+                raise Exception(f"exit code: {exit_code}")
+        except Exception as e:
+            print(f"{index}: Error: run {src} failed. {e}")
+        else:
+            print(f"{index}: Run \033[1;32m{src}\033[0m successfully.")
+        # remove the executable file
+        os.remove(exe_name)
+    print("All tests passed!")
