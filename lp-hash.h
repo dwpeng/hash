@@ -10,6 +10,7 @@
     hash##name##_entry_t* entries;                                            \
     uint64_t capacity;                                                        \
     uint64_t offset;                                                          \
+    uint64_t* flags;                                                          \
   };                                                                          \
   typedef struct {                                                            \
     uint64_t size;                                                            \
@@ -76,6 +77,8 @@
       table->raw.entries[i]->offset = 0;                                      \
       table->raw.entries[i]->entries = (hash##name##_entry_t*)hash_malloc(    \
           sizeof(hash##name##_entry_t) * block_size);                         \
+      table->raw.entries[i]->flags =                                          \
+          (uint64_t*)hash_malloc(sizeof(uint64_t) * (block_size + 63) / 64);  \
     }                                                                         \
     table->iter.block_index = 0;                                              \
     table->iter.offset = 0;                                                   \
@@ -89,6 +92,7 @@
   {                                                                           \
     for (int i = 0; i < table->raw.nblocks; i++) {                            \
       hash_free(table->raw.entries[i]->entries);                              \
+      hash_free(table->raw.entries[i]->flags);                                \
       hash_free(table->raw.entries[i]);                                       \
     }                                                                         \
     hash_free(table->raw.entries);                                            \
@@ -106,6 +110,8 @@
     table->iter.offset = 0;                                                   \
     for (int i = 0; i < table->raw.nblocks; i++) {                            \
       table->raw.entries[i]->offset = 0;                                      \
+      memset(table->raw.entries[i]->flags, 0,                                 \
+             sizeof(uint64_t) * (table->raw.entries[i]->capacity + 63) / 64); \
     }                                                                         \
   }                                                                           \
   static inline void lphash##name##_resize(lphash##name##_t* table)           \
@@ -146,6 +152,8 @@
       table->raw.entries[i]->offset = 0;                                      \
       table->raw.entries[i]->entries = (hash##name##_entry_t*)hash_malloc(    \
           sizeof(hash##name##_entry_t) * block_size);                         \
+      table->raw.entries[i]->flags =                                          \
+          (uint64_t*)hash_malloc(sizeof(uint64_t) * (block_size + 63) / 64);  \
     }                                                                         \
     table->raw.nblocks = nblocks;                                             \
     table->raw.capacity = capacity;                                           \
@@ -173,6 +181,7 @@
         *exist = 1;                                                           \
         if (replace) {                                                        \
           table->raw.entries[block_index]->entries[block_offset] = *entry;    \
+          __set(table->raw.entries[block_index]->flags, block_offset);        \
         }                                                                     \
         return &table->raw.entries[block_index]->entries[block_offset];       \
       }                                                                       \
@@ -184,6 +193,7 @@
     table->entries[h] =                                                       \
         table->raw.block_index * table->raw.block_size + block->offset;       \
     block->entries[block->offset] = *entry;                                   \
+    __set(block->flags, block->offset);                                       \
     block->offset++;                                                          \
     table->size++;                                                            \
     if (block->offset == block->capacity) {                                   \
@@ -240,7 +250,7 @@
       if (feq(table->raw.entries[block_index]->entries[block_offset].key,     \
               key)) {                                                         \
         __unset(table->flags, h);                                             \
-        table->raw.entries[block_index]->offset--;                            \
+        __unset(table->raw.entries[block_index]->flags, block_offset);        \
         table->size--;                                                        \
         return 1;                                                             \
       }                                                                       \
@@ -261,7 +271,13 @@
       table->iter.offset = 0;                                                 \
       return lphash##name##_iter(table);                                      \
     }                                                                         \
-    return &block->entries[table->iter.offset++];                             \
+    while (table->iter.offset < block->offset) {                              \
+      if (__is_set(block->flags, table->iter.offset)) {                       \
+        return &block->entries[table->iter.offset++];                         \
+      }                                                                       \
+      table->iter.offset++;                                                   \
+    }                                                                         \
+    return lphash##name##_iter(table);                                        \
   }                                                                           \
   static inline void lphash##name##_reset_iter(lphash##name##_t* table)       \
   {                                                                           \
