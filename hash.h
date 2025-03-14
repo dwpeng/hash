@@ -200,6 +200,35 @@ __hash_prime_bigger(uint64_t size)
     }                                                                         \
     return lphash##name##_get(table->linear, key, found);                     \
   }                                                                           \
+  static inline int hash##name##_del(hash##name##_t* table, ktype key)        \
+  {                                                                           \
+    uint64_t h = fhash(key);                                                  \
+    _hash##name##_array_t* array = table->array;                              \
+    {                                                                         \
+      hash##name##_entry_t* entries;                                          \
+      uint64_t index;                                                         \
+      for (int i = 0; i < table->m; i++) {                                    \
+        if (!array[i].size) {                                                 \
+          continue;                                                           \
+        }                                                                     \
+        index = __dwp_fastmod_u64(h, array[i].M, array[i].mask);              \
+        if (!__is_set(array[i].flags, index)) {                               \
+          continue;                                                           \
+        }                                                                     \
+        entries = array[i].entries;                                           \
+        if (feq(entries[index].key, key)) {                                   \
+          __unset(array[i].flags, index);                                     \
+          array[i].size--;                                                    \
+          table->size--;                                                      \
+          return 1;                                                           \
+        }                                                                     \
+      }                                                                       \
+    }                                                                         \
+    if (table->linear->size == 0) {                                           \
+      return 0;                                                               \
+    }                                                                         \
+    return lphash##name##_del(table->linear, key);                            \
+  }                                                                           \
   static inline hash##name##_entry_t* hash##name##_hput(                      \
       hash##name##_t* table, hash##name##_entry_t* entry, uint64_t h,         \
       int replace, int* exist)                                                \

@@ -226,6 +226,28 @@
     }                                                                         \
     return NULL;                                                              \
   }                                                                           \
+  static inline int lphash##name##_del(lphash##name##_t* table, ktype key)    \
+  {                                                                           \
+    uint64_t h = fhash(key);                                                  \
+    uint64_t mask = table->raw.mask;                                          \
+    h = __dwp_fastmod_u64(h, table->raw.M, mask);                             \
+    uint64_t block_index;                                                     \
+    uint64_t block_offset;                                                    \
+    while (__is_set(table->flags, h)) {                                       \
+      block_index = __dwp_fastdiv_u64(table->entries[h], table->raw.blockM);  \
+      block_offset = __dwp_fastmod_u64(table->entries[h], table->raw.blockM,  \
+                                       table->raw.block_size);                \
+      if (feq(table->raw.entries[block_index]->entries[block_offset].key,     \
+              key)) {                                                         \
+        __unset(table->flags, h);                                             \
+        table->raw.entries[block_index]->offset--;                            \
+        table->size--;                                                        \
+        return 1;                                                             \
+      }                                                                       \
+      h = __dwp_fastmod_u64(h + 1, table->raw.M, mask);                       \
+    }                                                                         \
+    return 0;                                                                 \
+  }                                                                           \
   static inline hash##name##_entry_t* lphash##name##_iter(                    \
       lphash##name##_t* table)                                                \
   {                                                                           \

@@ -127,6 +127,10 @@ __string_hashcode(const char* s)
 #ifndef __set
 #define __set(flags, index) ((flags)[(index) / 64] |= (1LLU << ((index) % 64)))
 #endif
+#ifndef __unset
+#define __unset(flags, index)                                                 \
+  ((flags)[(index) / 64] &= ~(1LLU << ((index) % 64)))
+#endif
 
 #define __hash_eq_number(a, b) ((a) == (b))
 #define __hash_eq_string(a, b) (strcmp((a), (b)) == 0)
