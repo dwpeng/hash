@@ -25,6 +25,7 @@ main()
     e = hashset_pack_get(set, i, &found);
     assert(e != NULL);
     assert(e->key >> 12 == i);
+    assert((e->key & 0xFFF) == i);
   }
   hashset_pack_free(set);
 }
