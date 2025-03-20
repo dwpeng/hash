@@ -24,7 +24,7 @@ main()
   for (int i = 0; i < 100; i++) {
     e = hashset_pack_get(set, i, &found);
     assert(e != NULL);
-    assert(e->key >> 12 == i);
+    assert(hashset_pack_entrykey(e) == i);
     assert((e->key & 0xFFF) == i);
   }
   hashset_pack_free(set);

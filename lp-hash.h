@@ -289,6 +289,10 @@
   {                                                                           \
     table->iter.block_index = 0;                                              \
     table->iter.offset = 0;                                                   \
+  }                                                                           \
+  static inline ktype lphash##name##_entrykey(hash##name##_entry_t* entry)    \
+  {                                                                           \
+    return fentrykey(entry->key);                                             \
   }
 
 #define _define_lphashtable(name, ktype, vtype, feq, fhash, fentrykey)        \
@@ -309,6 +313,7 @@
 #define lphashtable_resize(name, table)                               lphashtable_##name##_resize(table)
 #define lphashtable_iter(name, table)                                 lphashtable_##name##_iter(table)
 #define lphashtable_reset_iter(name, table)                           lphashtable_##name##_reset_iter(table)
+#define lphashtable_entrykey(name, entry)                             lphashtable_##name##_entrykey(entry)
 // clang-format on
 
 // clang-format off
@@ -321,6 +326,7 @@
 #define lphashset_resize(name, table)                                 lphashset_##name##_resize(table)
 #define lphashset_iter(name, table)                                   lphashset_##name##_iter(table)
 #define lphashset_reset_iter(name, table)                             lphashset_##name##_reset_iter(table)
+#define lphashset_entrykey(name, entry)                               lphashset_##name##_entrykey(entry)
 // clang-format on
 
 #ifdef __cplusplus

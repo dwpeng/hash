@@ -333,6 +333,10 @@ __hash_prime_bigger(uint64_t size)
     lphash##name##_clear(table->linear);                                      \
     hash##name##_reset_iter(table);                                           \
     table->size = 0;                                                          \
+  }                                                                           \
+  static inline ktype hash##name##_entrykey(hash##name##_entry_t* entry)      \
+  {                                                                           \
+    return fentrykey(entry->key);                                             \
   }
 
 #define _define_hashtable(name, ktype, vtype, feq, fhash, fentrykey)          \
@@ -348,6 +352,7 @@ __hash_prime_bigger(uint64_t size)
 #define hashtable_iter(name, table)                       hashtable_##name##_iter(table)
 #define hashtable_clear(name, table)                      hashtable_##name##_clear(table)
 #define hashtable_reset_iter(name, table)                 hashtable_##name##_reset_iter(table)
+#define hashtable_entrykey(name, entry)                   hashtable_##name##_entrykey(entry)
 // clang-format on
 
 #define _define_hashset(name, ketype, feq, fhash, fentrykey)                  \
@@ -363,6 +368,7 @@ __hash_prime_bigger(uint64_t size)
 #define hashset_iter(name, table)                                hashset_##name##_iter(table)
 #define hashset_clear(name, table)                               hashset_##name##_clear(table)
 #define hashset_reset_iter(name, table)                          hashset_##name##_reset_iter(table)
+#define hashset_entrykey(name, entry)                            hashset_##name##_entrykey(entry)
 // clang-format on
 
 #ifdef __cplusplus
