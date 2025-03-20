@@ -34,11 +34,10 @@ __lh3_Jenkins_hash_int(uint32_t key)
 }
 #define hash_equal(a, b) (a == b)
 #define hash_hash(key) __lh3_Jenkins_hash_int(key)
+#define hash_entrykey(ekey) (ekey) // compute the key of the entry
 
-// Step2: define hashtable entry
-define_hashtable_entry(ii, int, int)
-// Step3: define hashtable
-define_hashtable(ii, int, int, hash_equal, hash_hash)
+// Step2: define hashtable
+define_hashtable(ii, int, int, hash_equal, hash_hash, hash_entrykey)
 ```
 
 ### methods of hashtable

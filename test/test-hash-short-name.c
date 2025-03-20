@@ -1,6 +1,7 @@
 #include "hash.h"
 
-define_hash(test, int, int, __hash_eq_number, __hash_hash_u32);
+define_hash(
+    test, int, int, __hash_eq_number, __hash_hash_u32, __hash_entrykey);
 
 int
 main()

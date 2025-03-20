@@ -1,6 +1,11 @@
 #include "hash.h"
 
-define_hash(kmerfreq, uint64_t, int, __hash_eq_number, __hash_hash_u64);
+define_hash(kmerfreq,
+            uint64_t,
+            int,
+            __hash_eq_number,
+            __hash_hash_u64,
+            __hash_entrykey);
 
 int
 main()

@@ -90,7 +90,7 @@ __hash_prime_bigger(uint64_t size)
   return 0;
 }
 
-#define __define_hash(name, ktype, vtype, feq, fhash)                         \
+#define __define_hash(name, ktype, vtype, feq, fhash, fentrykey)              \
   typedef struct {                                                            \
     uint64_t mask;                                                            \
     __uint128_t M;                                                            \
@@ -114,7 +114,7 @@ __hash_prime_bigger(uint64_t size)
     } iter;                                                                   \
   } hash##name##_t;
 
-#define __define_hash_method(name, feq, fhash, ktype, vtype)                  \
+#define __define_hash_method(name, feq, fhash, fentrykey, ktype, vtype)       \
   static inline hash##name##_t* hash##name##_with_capacity(uint64_t capacity, \
                                                            int m, float load) \
   {                                                                           \
@@ -189,7 +189,7 @@ __hash_prime_bigger(uint64_t size)
           return NULL;                                                        \
         }                                                                     \
         entries = array[i].entries;                                           \
-        if (feq(entries[index].key, key)) {                                   \
+        if (feq(fentrykey(entries[index].key), key)) {                        \
           *found = 1;                                                         \
           return &entries[index];                                             \
         }                                                                     \
@@ -216,7 +216,7 @@ __hash_prime_bigger(uint64_t size)
           continue;                                                           \
         }                                                                     \
         entries = array[i].entries;                                           \
-        if (feq(entries[index].key, key)) {                                   \
+        if (feq(fentrykey(entries[index].key), key)) {                        \
           __unset(array[i].flags, index);                                     \
           array[i].size--;                                                    \
           table->size--;                                                      \
@@ -235,14 +235,14 @@ __hash_prime_bigger(uint64_t size)
   {                                                                           \
     _hash##name##_array_t* array_list = table->array;                         \
     hash##name##_entry_t* entries;                                            \
-    ktype key = entry->key;                                                   \
+    ktype key = fentrykey(entry->key);                                        \
     *exist = 0;                                                               \
     uint64_t index;                                                           \
     for (int i = 0; i < table->m; i++) {                                      \
       entries = array_list[i].entries;                                        \
       index = __dwp_fastmod_u64(h, array_list[i].M, array_list[i].mask);      \
       if (__is_set(array_list[i].flags, index)) {                             \
-        if (feq(entries[index].key, key)) {                                   \
+        if (feq(fentrykey(entries[index].key), key)) {                        \
           if (replace) {                                                      \
             memcpy(entries + index, entry, sizeof(hash##name##_entry_t));     \
           }                                                                   \
@@ -267,8 +267,8 @@ __hash_prime_bigger(uint64_t size)
       hash##name##_t* table, hash##name##_entry_t* entry, int replace,        \
       int* exist)                                                             \
   {                                                                           \
-    return hash##name##_hput(table, entry, fhash(entry->key), replace,        \
-                             exist);                                          \
+    return hash##name##_hput(table, entry, fhash(fentrykey(entry->key)),      \
+                             replace, exist);                                 \
   }                                                                           \
   static inline hash##name##_entry_t* hash##name##_iter(                      \
       hash##name##_t* table)                                                  \
@@ -335,9 +335,9 @@ __hash_prime_bigger(uint64_t size)
     table->size = 0;                                                          \
   }
 
-#define _define_hashtable(name, ktype, vtype, feq, fhash)                     \
-  __define_hash(table_##name, ktype, vtype, feq, fhash);                      \
-  __define_hash_method(table_##name, feq, fhash, ktype, vtype);
+#define _define_hashtable(name, ktype, vtype, feq, fhash, fentrykey)          \
+  __define_hash(table_##name, ktype, vtype, feq, fhash, fentrykey);           \
+  __define_hash_method(table_##name, feq, fhash, fentrykey, ktype, vtype);
 
 // clang-format off
 #define hashtable_with_capacity(name, max_size, m, load)  hashtable_##name##_with_capacity(max_size, m, load)
@@ -350,9 +350,9 @@ __hash_prime_bigger(uint64_t size)
 #define hashtable_reset_iter(name, table)                 hashtable_##name##_reset_iter(table)
 // clang-format on
 
-#define _define_hashset(name, ketype, feq, fhash)                             \
-  __define_hash(set_##name, ketype, NULL, feq, fhash);                        \
-  __define_hash_method(set_##name, feq, fhash, ketype, NULL);
+#define _define_hashset(name, ketype, feq, fhash, fentrykey)                  \
+  __define_hash(set_##name, ketype, NULL, feq, fhash, fentrykey);             \
+  __define_hash_method(set_##name, feq, fhash, fentrykey, ketype, NULL);
 
 // clang-format off
 #define hashset_with_capacity(name, max_size, m, load)           hashset_##name##_with_capacity(max_size, m, load)
@@ -369,36 +369,38 @@ __hash_prime_bigger(uint64_t size)
 extern "C" {
 #endif
 
-_define_hashtable(ii, int, int, __hash_eq_number, __hash_hash_u32);
-_define_hashtable(ll, int64_t, int64_t, __hash_eq_number, __hash_hash_u64);
-_define_hashtable(si, char*, int, __hash_eq_string, __hash_hash_string);
-_define_hashtable(ss, char*, char*, __hash_eq_string, __hash_hash_string);
-_define_hashtable(li, int64_t, int, __hash_eq_number, __hash_hash_u64);
+// clang-format off
+_define_hashtable(ii, int, int, __hash_eq_number, __hash_hash_u32, __hash_entrykey);
+_define_hashtable(ll, int64_t, int64_t, __hash_eq_number, __hash_hash_u64, __hash_entrykey);
+_define_hashtable(si, char*, int, __hash_eq_string, __hash_hash_string, __hash_entrykey);
+_define_hashtable(ss, char*, char*, __hash_eq_string, __hash_hash_string, __hash_entrykey);
+_define_hashtable(li, int64_t, int, __hash_eq_number, __hash_hash_u64, __hash_entrykey);
 
-_define_hashset(i, int, __hash_eq_number, __hash_hash_u32);
-_define_hashset(l, int64_t, __hash_eq_number, __hash_hash_u64);
-_define_hashset(s, char*, __hash_eq_string, __hash_hash_string);
+_define_hashset(i, int, __hash_eq_number, __hash_hash_u32, __hash_entrykey);
+_define_hashset(l, int64_t, __hash_eq_number, __hash_hash_u64, __hash_entrykey);
+_define_hashset(s, char*, __hash_eq_string, __hash_hash_string, __hash_entrykey);
 
+// clang-format on
 #ifdef __cplusplus
 }
 #endif
 
-#define define_hash(name, ktype, vtype, feq, fhash)                           \
+#define define_hash(name, ktype, vtype, feq, fhash, fentrykey)                \
   define_hashtable_entry(name, ktype, vtype);                                 \
   define_hashset_entry(name, ktype);                                          \
-  _define_lphashtable(name, ktype, vtype, feq, fhash);                        \
-  _define_lphashset(name, ktype, feq, fhash);                                 \
-  _define_hashtable(name, ktype, vtype, feq, fhash);                          \
-  _define_hashset(name, ktype, feq, fhash);
+  _define_lphashtable(name, ktype, vtype, feq, fhash, fentrykey);             \
+  _define_lphashset(name, ktype, feq, fhash, fentrykey);                      \
+  _define_hashtable(name, ktype, vtype, feq, fhash, fentrykey);               \
+  _define_hashset(name, ktype, feq, fhash, fentrykey);
 
-#define define_hashtable(name, ktype, vtype, feq, fhash)                      \
+#define define_hashtable(name, ktype, vtype, feq, fhash, fentrykey)           \
   define_hashtable_entry(name, ktype, vtype);                                 \
-  _define_lphashtable(name, ktype, vtype, feq, fhash);                        \
-  _define_hashtable(name, ktype, vtype, feq, fhash)
+  _define_lphashtable(name, ktype, vtype, feq, fhash, fentrykey);             \
+  _define_hashtable(name, ktype, vtype, feq, fhash, fentrykey)
 
-#define define_hashset(name, ktype, feq, fhash)                               \
+#define define_hashset(name, ktype, feq, fhash, fentrykey)                    \
   define_hashset_entry(name, ktype);                                          \
-  _define_lphashset(name, ktype, feq, fhash);                                 \
-  _define_hashset(name, ktype, feq, fhash)
+  _define_lphashset(name, ktype, feq, fhash, fentrykey);                      \
+  _define_hashset(name, ktype, feq, fhash, fentrykey)
 
 #endif

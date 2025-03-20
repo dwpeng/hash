@@ -49,7 +49,7 @@
 //  entries ->|offset|      |      |      | .... |  -> i * MAX_OFFSET_SIZE + j
 //            +------+------+------+------+------+
 
-#define __define_lphash_method(name, ktype, feq, fhash)                       \
+#define __define_lphash_method(name, ktype, feq, fhash, fentrykey)            \
   static inline lphash##name##_t* lphash##name##_with_capacity(               \
       uint64_t capacity, uint64_t block_size, float load_factor)              \
   {                                                                           \
@@ -176,8 +176,10 @@
       block_index = __dwp_fastdiv_u64(table->entries[h], table->raw.blockM);  \
       block_offset = __dwp_fastmod_u64(table->entries[h], table->raw.blockM,  \
                                        table->raw.block_size);                \
-      if (feq(table->raw.entries[block_index]->entries[block_offset].key,     \
-              entry->key)) {                                                  \
+      if (feq(fentrykey(table->raw.entries[block_index]                       \
+                            ->entries[block_offset]                           \
+                            .key),                                            \
+              fentrykey(entry->key))) {                                       \
         *exist = 1;                                                           \
         if (replace) {                                                        \
           table->raw.entries[block_index]->entries[block_offset] = *entry;    \
@@ -208,8 +210,8 @@
       lphash##name##_t* table, hash##name##_entry_t* entry, int replace,      \
       int* exist)                                                             \
   {                                                                           \
-    return lphash##name##_hput(table, entry, fhash(entry->key), replace,      \
-                               exist);                                        \
+    return lphash##name##_hput(table, entry, fhash(fentrykey(entry->key)),    \
+                               replace, exist);                               \
   }                                                                           \
   static inline hash##name##_entry_t* lphash##name##_get(                     \
       lphash##name##_t* table, ktype key, int* exist)                         \
@@ -227,7 +229,9 @@
       block_offset = __dwp_fastmod_u64(table->entries[h], table->raw.blockM,  \
                                        table->raw.block_size);                \
       assert(table->entries[h] % table->raw.block_size == block_offset);      \
-      if (feq(table->raw.entries[block_index]->entries[block_offset].key,     \
+      if (feq(fentrykey(table->raw.entries[block_index]                       \
+                            ->entries[block_offset]                           \
+                            .key),                                            \
               key)) {                                                         \
         *exist = 1;                                                           \
         return &table->raw.entries[block_index]->entries[block_offset];       \
@@ -247,7 +251,9 @@
       block_index = __dwp_fastdiv_u64(table->entries[h], table->raw.blockM);  \
       block_offset = __dwp_fastmod_u64(table->entries[h], table->raw.blockM,  \
                                        table->raw.block_size);                \
-      if (feq(table->raw.entries[block_index]->entries[block_offset].key,     \
+      if (feq(fentrykey(table->raw.entries[block_index]                       \
+                            ->entries[block_offset]                           \
+                            .key),                                            \
               key)) {                                                         \
         __unset(table->flags, h);                                             \
         __unset(table->raw.entries[block_index]->flags, block_offset);        \
@@ -285,13 +291,13 @@
     table->iter.offset = 0;                                                   \
   }
 
-#define _define_lphashtable(name, ktype, vtype, feq, fhash)                   \
+#define _define_lphashtable(name, ktype, vtype, feq, fhash, fentrykey)        \
   __define_lphash(table_##name, ktype, vtype);                                \
-  __define_lphash_method(table_##name, ktype, feq, fhash)
+  __define_lphash_method(table_##name, ktype, feq, fhash, fentrykey)
 
-#define _define_lphashset(name, ktype, feq, fhash)                            \
+#define _define_lphashset(name, ktype, feq, fhash, fentrykey)                 \
   __define_lphash(set_##name, ktype, ktype);                                  \
-  __define_lphash_method(set_##name, ktype, feq, fhash)
+  __define_lphash_method(set_##name, ktype, feq, fhash, fentrykey)
 
 // clang-format off
 #define lphashtable_with_capacity(name, capacity, block_size, load)   lphashtable_##name##_with_capacity(capacity, block_size, load)
@@ -320,33 +326,33 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+// clang-format off
+_define_lphashtable(ii, int, int, __hash_eq_number, __hash_hash_u32, __hash_entrykey);
+_define_lphashtable(ll, int64_t, int64_t, __hash_eq_number, __hash_hash_u64, __hash_entrykey);
+_define_lphashtable(si, char*, int, __hash_eq_string, __hash_hash_string, __hash_entrykey);
+_define_lphashtable(ss, char*, char*, __hash_eq_string, __hash_hash_string, __hash_entrykey);
+_define_lphashtable(li, int64_t, int, __hash_eq_number, __hash_hash_u64, __hash_entrykey);
 
-_define_lphashtable(ii, int, int, __hash_eq_number, __hash_hash_u32);
-_define_lphashtable(ll, int64_t, int64_t, __hash_eq_number, __hash_hash_u64);
-_define_lphashtable(si, char*, int, __hash_eq_string, __hash_hash_string);
-_define_lphashtable(ss, char*, char*, __hash_eq_string, __hash_hash_string);
-_define_lphashtable(li, int64_t, int, __hash_eq_number, __hash_hash_u64);
-
-_define_lphashset(i, int, __hash_eq_number, __hash_hash_u32);
-_define_lphashset(l, int64_t, __hash_eq_number, __hash_hash_u64);
-_define_lphashset(s, char*, __hash_eq_string, __hash_hash_string);
-
+_define_lphashset(i, int, __hash_eq_number, __hash_hash_u32, __hash_entrykey);
+_define_lphashset(l, int64_t, __hash_eq_number, __hash_hash_u64, __hash_entrykey);
+_define_lphashset(s, char*, __hash_eq_string, __hash_hash_string, __hash_entrykey);
+// clang-format on
 #ifdef __cplusplus
 }
 #endif
 
-#define define_lphash(name, ktype, vtype, feq, fhash)                         \
+#define define_lphash(name, ktype, vtype, feq, fhash, fentrykey)              \
   define_hashtable_entry(name, ktype, vtype);                                 \
   define_hashset_entry(name, ktype);                                          \
-  _define_lphashtable(name, ktype, vtype, feq, fhash);                        \
-  _define_lphashset(name, ktype, feq, fhash)
+  _define_lphashtable(name, ktype, vtype, feq, fhash, fentrykey);             \
+  _define_lphashset(name, ktype, feq, fhash, fentrykey)
 
-#define define_lphashtable(name, ktype, vtype, feq, fhash)                    \
+#define define_lphashtable(name, ktype, vtype, feq, fhash, fentrykey)         \
   define_hashtable_entry(name, ktype, vtype);                                 \
-  _define_lphashtable(name, ktype, vtype, feq, fhash)
+  _define_lphashtable(name, ktype, vtype, feq, fhash, fentrykey)
 
-#define define_lphashset(name, ktype, feq, fhash)                             \
+#define define_lphashset(name, ktype, feq, fhash, fentrykey)                  \
   define_hashset_entry(name, ktype);                                          \
-  _define_lphashset(name, ktype, feq, fhash)
+  _define_lphashset(name, ktype, feq, fhash, fentrykey)
 
 #endif // __lp_hash_h__

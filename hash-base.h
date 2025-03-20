@@ -137,6 +137,7 @@ __string_hashcode(const char* s)
 #define __hash_hash_u32(key) __lh3_Jenkins_hash_int(key)
 #define __hash_hash_u64(key) __lh3_Jenkins_hash_64(key)
 #define __hash_hash_string(key) __string_hashcode(key)
+#define __hash_entrykey(ekey) (ekey)
 
 #define define_hashtable_entry(name, ktype, vtype)                            \
   typedef struct {                                                            \

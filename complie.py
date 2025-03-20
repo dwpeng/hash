@@ -9,7 +9,7 @@ language_map = {
 }
 
 
-def complie_file(src: str, exe_name: str, flags: list = [], deps: list = []):
+def compile_file(src: str, exe_name: str, flags: list = [], deps: list = []):
     if not os.path.isfile(src):
         print(f"Error: {src} is not a file.")
         sys.exit(1)
@@ -56,7 +56,7 @@ if __name__ == "__main__":
         if os.path.exists(exe_name):
             os.remove(exe_name)
         try:
-            complie_file(os.path.join(test_dir, src), exe_name, flags, deps)
+            compile_file(os.path.join(test_dir, src), exe_name, flags, deps)
         except Exception as e:
             print(f"{index}: Error: complie {src} failed. {e}")
         else:
@@ -68,6 +68,16 @@ if __name__ == "__main__":
                 raise Exception(f"exit code: {exit_code}")
         except Exception as e:
             print(f"{index}: Error: run {src} failed. {e}")
+            new_flags = flags.copy()
+            new_flags.remove("-O3")
+            new_flags.append("-O0")
+            new_flags.append("-DDEBUG")
+            new_flags.append("-lasan")
+            new_flags.append("-fsanitize=address")
+            new_flags.append("-fno-omit-frame-pointer")
+            compile_file(os.path.join(test_dir, src), exe_name, new_flags, deps)
+            # run
+            os.system(f"./{exe_name}")
         else:
             print(f"{index}: Run \033[1;32m{src}\033[0m successfully.")
         # remove the executable file
