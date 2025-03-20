@@ -3,10 +3,10 @@
 // pack: key: 20
 // pack: value: 12
 
-#define hash_code(key) (__hash_hash_u32(key))
-#define hash_eq(a, b) ((a) == (b))
-#define hash_eq2(ek) ((ek >> 12))
-define_hashset(pack, uint32_t, hash_eq, hash_code, hash_eq2);
+#define get_pack_hash(key) __hash_hash_u32(key)
+#define pack_key_seq(a, b) __hash_eq_number(a, b)
+#define get_pack_key(ek) ((ek >> 12))
+define_hashset(pack, uint32_t, pack_key_seq, get_pack_hash, get_pack_key);
 
 int
 main()
